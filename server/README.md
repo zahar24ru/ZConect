@@ -21,6 +21,7 @@ go run ./cmd/signaling
 - `POST /api/v1/session/create`
 - `POST /api/v1/session/join`
 - `POST /api/v1/session/close`
+- `GET /ws?session_id=...` — WebSocket для обмена SDP/ICE между peer
 
 ## Логи
 
@@ -28,6 +29,5 @@ go run ./cmd/signaling
 
 ## Ограничения текущего этапа
 
-- Хранилище сессий пока in-memory.
+- Хранилище сессий in-memory (Redis в docker-compose пока не используется в коде).
 - `ws_token` пока заглушка.
-- WebSocket signaling endpoint `/ws` будет добавлен на следующем этапе.

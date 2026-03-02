@@ -7,26 +7,28 @@
 - `coturn` (STUN/TURN)
 - `nginx/caddy` (TLS termination, по желанию)
 
-## 2) One-command деплой
+## 2) Деплой (после клонирования репозитория)
 
-Цель: поднять сервер одной командой.
+Скрипт `install.sh` нужно запускать **из каталога репозитория** (он ожидает, что рядом есть `server/` и `deploy/`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<org>/<repo>/main/deploy/install.sh | bash
+git clone https://github.com/<org>/<repo>.git
+cd <repo>
+./deploy/install.sh
 ```
 
-Если вы деплоите на VPS из Windows, см. отдельную пошаговую инструкцию:
+Если вы деплоите на VPS из Windows, см. пошаговую инструкцию:
 
 - `docs/DEPLOY_FROM_WINDOWS.md`
 
 Скрипт `install.sh` делает:
 
-1. Устанавливает Docker + Compose plugin.
-2. Клонирует/обновляет репозиторий.
-3. Создает `.env` из шаблона.
-4. Проверяет firewall и открывает нужные порты.
-5. Запускает `docker compose up -d`.
-6. Проверяет `healthz`.
+1. Проверяет наличие Docker и Docker Compose plugin.
+2. Создает `deploy/.env` из шаблона (если файла ещё нет).
+3. Запускает `docker compose up -d --build` (signaling, redis, coturn).
+4. Проверяет `healthz`.
+
+**Важно:** для работы TURN из интернета в `deploy/.env` укажите реальный внешний IP сервера в переменной `PUBLIC_IPV4` (не `127.0.0.1`).
 
 Если one-command запуск невозможен (ограниченный shell), fallback:
 
