@@ -1,0 +1,137 @@
+# Статус реализации
+
+## Выполнено
+
+- Подготовлена модульная структура репозитория.
+- Описана архитектура системы и протоколы (`docs/ARCHITECTURE.md`, `docs/API.md`).
+- Описаны деплой и логирование (`docs/DEPLOY_UBUNTU24.md`, `docs/LOGGING.md`).
+- Реализован серверный MVP-каркас:
+  - `POST /api/v1/session/create`
+  - `POST /api/v1/session/join`
+  - `POST /api/v1/session/close`
+  - `GET /healthz`
+- Реализован WebSocket signaling endpoint:
+  - `GET /ws?session_id=...`
+  - relay сообщений между двумя peer в рамках сессии
+- Реализована логика сессий:
+  - генерация `login_code(8)` и `pass_code(8)`
+  - TTL сессии
+  - лимиты попыток и временная блокировка
+  - очистка просроченных/закрытых сессий
+- Логирование сервера в `logs.log` (JSONL).
+- Добавлены Docker файлы для старта `signaling + redis + coturn`.
+- Создан клиентский WPF каркас (`client/UiApp`) с главным окном.
+- Добавлены настраиваемые параметры клиента:
+  - Server API URL
+  - WebSocket URL
+  - STUN/TURN URL + учетные данные
+  - Prefer Relay
+  - путь к `ffmpeg.exe`
+- Настройки сохраняются в `%AppData%\\ZConect\\client-settings.json`.
+- Реализован `SessionClient` (HTTP вызовы `create/join`).
+- Кнопки UI "Создать сессию" и "Подключиться" подключены к API сервера.
+- Клиентская сборка `UiApp.sln` проходит успешно (0 ошибок, 0 предупреждений).
+- Добавлен модуль `WebRtcTransport` с `WebSocketSignalingClient`.
+- После успешного `join` клиент подключается к `/ws` и получает signaling события.
+- Добавлен `SignalingCoordinator` для маршрутизации `offer/answer/ice`.
+- Добавлен `IPeerConnectionAgent` и временный `MockPeerConnectionAgent`.
+- В UI обеспечено безопасное обновление состояния из фонового WS-потока.
+- Добавлен слой data channels:
+  - `DataChannelCoordinator`
+  - контракты `clipboard/input/file`
+  - `MockDataChannelAgent` для loopback проверки
+- Интегрирован реальный WebRTC backend:
+  - `MixedRealityPeerConnectionAgent`
+  - `MixedRealityDataChannelAgent`
+  - автопереключение на mock при ошибке инициализации
+- Добавлена первичная врезка live desktop video в реальный `PeerConnection`:
+  - новый контракт `ConfigureLocalVideoAsync` в `IPeerConnectionAgent`
+  - `LocalVideoOptions` (координаты, размер, fps)
+  - `MixedRealityPeerConnectionAgent` теперь поднимает `ExternalVideoTrackSource` + `LocalVideoTrack`
+  - кадры забираются с выбранного экрана через GDI (`CopyFromScreen`) и отдаются в ARGB callback
+  - в `MainViewModel` локальное видео настраивается на host только когда реально подключился viewer (после применения remote offer и до генерации answer, через hook `beforeCreateAnswerAsync`)
+- Добавлен рендер удаленного видео-трека в UI:
+  - `IPeerConnectionAgent` расширен событием `RemoteVideoFrameReceived`
+  - `MixedRealityPeerConnectionAgent` подписывается на `PeerConnection.VideoTrackAdded/Removed`
+  - кадры удаленного `RemoteVideoTrack` (`Argb32VideoFrameReady`) прокидываются в `RemoteVideoFrame`
+  - `MainViewModel` конвертирует кадры в `WriteableBitmap` (`RemoteFrameImage`)
+  - рендер вывода делается через отдельное окно `RemoteScreenWindow` (ресайз/максимизация)
+- Добавлен host-side обработчик `dc-input`:
+  - создан `WindowsInputInjectionService` (WinAPI `SendInput`/`SetCursorPos`)
+  - `MainViewModel` подписан на `DataChannelCoordinator.MouseReceived/KeyboardReceived`
+  - входящие `mouse_input`/`keyboard_input` применяются к локальной ОС с логированием ошибок/успеха
+- Доведён `dc-input` до end-to-end (viewer -> host):
+  - окно `RemoteScreenWindow` захватывает mouse/keyboard события и отправляет в `dc-input`
+  - добавлен `screen_meta` (capture-rect) для корректного маппинга координат при `Stretch=Uniform` и multi-monitor offsets
+- Исправлена логика ролей для "помощь пользователю":
+  - `Создать сессию` = host (шарит экран и принимает управление)
+  - `Подключиться` = viewer (видит экран host и отправляет input)
+- Viewer открывает отдельное окно `RemoteScreenWindow` (масштабирование/максимизация); в главном окне превью удалённого экрана нет.
+- Исправлено “обрезание” картинки: локальный захват всегда в полный размер выбранного дисплея (или bounding box всех дисплеев при `DisplayMode=All`), пресет качества влияет только на FPS.
+- Добавлено viewer-side управление видео host через `dc-control`:
+  - в `RemoteScreenWindow` viewer может выбрать `QualityPreset`, `DisplayMode`, `DisplayId`
+  - кнопка `Применить` отправляет запрос на изменение захвата host “на лету” (без полного переподключения)
+  - кнопка `Быстрый реконнект` отправляет тот же запрос с флагом быстрой renegotiation (`offer/answer`) для более надежного переключения
+  - host после применения отправляет обновленный `screen_meta` для корректного маппинга input
+- Улучшено закрытие приложения:
+  - при закрытии `RemoteScreenWindow` используется `Hide`, но при общем выходе есть принудительный real close
+  - `MainWindow` выполняет bounded graceful shutdown (с fallback), чтобы не оставлять висящий `UiApp.exe`
+- Добавлены модули качества и видео-probe:
+  - `client/QualityController` (профили Low/Medium/High/Auto)
+  - `client/ScreenCapture` (enumeration дисплеев + `FfmpegVp8ProbeService`)
+- В UI добавлена кнопка `VP8 Probe` для проверки `ffmpeg.exe` и VP8-энкодера.
+- `VP8 Probe` переведен на реальный desktop capture через `ffmpeg gdigrab`:
+  - учитывается выбранный `DisplayId` (или primary display по умолчанию)
+  - учитываются параметры профиля качества (`resolution/fps/bitrate`)
+  - результат пишется в `.webm` в папку `probe`
+- Реализован двусторонний `dc-clipboard`:
+  - синхронизация текста host <-> viewer через `clipboard_text`
+  - лимит payload: 256 KB (UTF-8)
+  - защита от эхо и ретраи отправки при временной недоступности data channel
+  - служебный `zconect-init` не применяется к системному clipboard
+- Добавлена вкладка `debug-log` в системных настройках:
+  - фильтрация шумных DEBUG-категорий (`DataChannel Input`, `Clipboard`, `Signaling/WS`, `WebRTC`)
+  - фильтрация применяется в `LogService` до записи в `logs.log`
+- Клиент переведен на запуск с UAC-повышением (`requireAdministrator` через `app.manifest`).
+- Добавлено управление политикой показа UAC в удаленной сессии:
+  - кнопка в `debug-log` меняет `HKLM\\...\\Policies\\System\\PromptOnSecureDesktop` (0/1)
+  - перед изменением показывается предупреждение
+- Реализован MVP `dc-file` (двусторонняя передача):
+  - отправка файла по `file_meta -> file_chunk -> file_end`
+  - chunk размер ~16 KB для уменьшения влияния на `dc-input`
+  - отображение прогресса отправки/приема в UI (`xx%`)
+  - проверка `SHA-256` после получения
+  - авто-сохранение у получателя в `%UserProfile%\\Downloads\\ZConectReceived`
+  - временный файл принимается в `%LocalAppData%\\ZConect\\IncomingTemp`
+- Добавлен авто-режим ICE для viewer:
+  - последовательные попытки подключения: `LAN (3с) -> srflx (4с) -> relay (5с)`
+  - на этапах применена фильтрация ICE-кандидатов по типу, чтобы ранний `relay` не перебивал `host/srflx`
+  - при неуспехе всех этапов — fallback к стандартному ICE-режиму
+- Добавлен расширенный ICE-статус в UI:
+  - строка `ICE: <route> [hint] (local:<type>/<ip>, remote:<type>/<ip>)`
+  - цветовая индикация: `host` (green), `srflx` (yellow), `relay` (orange)
+  - debug-блок с последними 5 ICE-кандидатами (`time direction:type ip:port`)
+- При штатном закрытии клиента выполняется авто-закрытие текущей сессии:
+  - вызов `POST /api/v1/session/close` из `SessionApiClient`
+- В UI для выбора монитора (`DisplayId`) добавлены выпадающие списки:
+  - `Настройки -> Система`
+  - `RemoteScreenWindow` после подключения
+  - при отсутствии найденных дисплеев используется fallback `DISPLAY1`
+- Добавлена синхронизация типа курсора по data channel:
+  - host отправляет `cursor_shape` в `dc-control` при изменении курсора
+  - viewer применяет соответствующий локальный курсор (`arrow/ibeam/hand/resize/wait/...`)
+
+## Не завершено
+
+- Краткоживущий `ws_token` (сейчас заглушка).
+- Интеграция Redis в код сервера (сейчас in-memory).
+- Проверка и стабилизация VP8 end-to-end профилей под реальной нагрузкой (адаптация bitrate/fps).
+- Валидация/ограничение координат `dc-input` на host (защита от выхода за bounds, multi-monitor edge cases).
+- Расширение `dc-file`: `file_ack/file_error`, отмена/возобновление передачи, выбор папки без блокировки удаленного управления.
+- Точный selected ICE candidate pair (сейчас в UI показывается candidate-based `hint`).
+
+## Ближайший этап
+
+1. Провести стабилизацию захвата/кодирования (нагрузка, multi-monitor, частота кадров, тайминги).
+2. Довести `dc-input` до production-стабильности и расширить `dc-file` (`ack/error/cancel/resume`, QoS под слабый канал).
+3. Перевести обмен SDP/ICE в более строгую схему ролей (caller/callee) и проверить двухсторонний старт.

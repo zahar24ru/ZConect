@@ -1,0 +1,129 @@
+<Window x:Class="UiApp.SystemSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ZConnect — Система"
+        MinWidth="520"
+        MinHeight="480"
+        Width="620"
+        Height="700"
+        Background="#D2E1ED"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#EEF3F8" CornerRadius="10" Padding="12" Margin="0,0,0,8">
+            <TabControl>
+                <TabItem Header="system">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="8">
+                            <TextBlock Text="Система: качество и экран" FontWeight="SemiBold"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <ComboBox Width="260" Height="30" Margin="0,0,8,0"
+                                          Text="{Binding QualityPreset, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBoxItem Content="Auto"/>
+                                    <ComboBoxItem Content="Low"/>
+                                    <ComboBoxItem Content="Medium"/>
+                                    <ComboBoxItem Content="High"/>
+                                </ComboBox>
+                                <ComboBox Width="260" Height="30"
+                                          Text="{Binding DisplayMode, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBoxItem Content="Current"/>
+                                    <ComboBoxItem Content="Any"/>
+                                    <ComboBoxItem Content="All"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <ComboBox Height="30" Margin="0,8,0,0"
+                                      ItemsSource="{Binding AvailableDisplayIds}"
+                                      SelectedItem="{Binding DisplayId, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Система: сеть и FFmpeg" FontWeight="SemiBold" Margin="0,14,0,0"/>
+
+                            <TextBlock Text="Server API URL" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding ServerApiBaseUrl, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <TextBlock Text="WebSocket URL" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding WebSocketUrl, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <TextBlock Text="STUN URL" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding StunUrl, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <TextBlock Text="TURN URL" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding TurnUrl, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <TextBlock Text="TURN Username" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding TurnUsername, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <TextBlock Text="TURN Password" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding TurnPassword, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+
+                            <CheckBox Content="Prefer Relay (TURN)" Margin="0,8,0,0"
+                                      IsChecked="{Binding PreferRelay}"/>
+                            <CheckBox Content="Приоритет LAN/VPN (без TURN)" Margin="0,6,0,0"
+                                      IsChecked="{Binding PreferLanVpnNoTurn}"/>
+                            <CheckBox Content="Авто ICE по этапам (LAN 3с -> srflx 4с -> relay 5с)" Margin="0,6,0,0"
+                                      IsChecked="{Binding AutoIceByPriority}"/>
+                            <TextBlock Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#4A5660"
+                                       Text="В этом режиме TURN не используется. Подходит для одной LAN/VPN (Radmin VPN и т.п.)."/>
+
+                            <TextBlock Text="FFmpeg Path (ffmpeg.exe)" Margin="0,8,0,2"/>
+                            <TextBox Text="{Binding FfmpegPath, UpdateSourceTrigger=PropertyChanged}" Height="30"/>
+                            <Button Content="VP8 Probe"
+                                    Margin="0,8,0,0"
+                                    Height="30"
+                                    Command="{Binding RunFfmpegProbeCommand}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="debug-log">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="Управление шумными DEBUG-логами" FontWeight="SemiBold"/>
+                        <TextBlock Text="Изменения применяются сразу и сохраняются после нажатия кнопки &quot;Сохранить настройки&quot;."
+                                   Margin="0,6,0,10"
+                                   TextWrapping="Wrap"/>
+
+                        <CheckBox Content="DataChannel Input (mouse/keyboard dc_sent/dc_recv)"
+                                  Margin="0,4,0,0"
+                                  IsChecked="{Binding DebugLogDataChannelInputEnabled}"/>
+                        <CheckBox Content="Clipboard (ClipboardSync + DataChannel Clipboard)"
+                                  Margin="0,4,0,0"
+                                  IsChecked="{Binding DebugLogClipboardEnabled}"/>
+                        <CheckBox Content="Signaling + WS (Signaling и UiApp ws_message_*)"
+                                  Margin="0,4,0,0"
+                                  IsChecked="{Binding DebugLogSignalingEnabled}"/>
+                        <CheckBox Content="WebRTC"
+                                  Margin="0,4,0,0"
+                                  IsChecked="{Binding DebugLogWebRtcEnabled}"/>
+
+                        <Separator Margin="0,12,0,8"/>
+                        <TextBlock Text="UAC в удаленной сессии" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding UacPromptOnSecureDesktopStateText}"/>
+                        <Button Margin="0,8,0,0"
+                                Height="32"
+                                Content="{Binding UacToggleButtonText}"
+                                Command="{Binding ToggleUacSecureDesktopPolicyCommand}"/>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+        </Border>
+
+        <Border Grid.Row="1" Background="#E9F0F6" CornerRadius="10" Padding="10">
+            <DockPanel>
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                <Button Content="Сохранить настройки"
+                        Width="170"
+                        Height="30"
+                        DockPanel.Dock="Right"
+                        Command="{Binding SaveSettingsCommand}"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

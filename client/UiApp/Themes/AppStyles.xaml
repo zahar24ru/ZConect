@@ -1,0 +1,97 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Цвета -->
+  <Color x:Key="PrimaryColor">#155FA2</Color>
+  <Color x:Key="PrimaryHoverColor">#0F4A80</Color>
+  <Color x:Key="WindowBgColor">#F3F7FC</Color>
+  <Color x:Key="BorderColor">#D7E2EF</Color>
+  <Color x:Key="TextSecondaryColor">#42586E</Color>
+  <Color x:Key="TextPrimaryColor">#1F2E3D</Color>
+  <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+  <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryHoverColor}"/>
+  <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+
+  <!-- Стиль кнопки: скругление, синий фон, белый текст, hover -->
+  <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="8"
+                  Padding="{TemplateBinding Padding}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  BorderBrush="{TemplateBinding BorderBrush}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{StaticResource PrimaryHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Стиль TextBox: только внешний вид, без замены шаблона (чтобы текст отображался) -->
+  <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox">
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Background" Value="White"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+
+  <!-- Стиль read-only TextBox (логин/пароль созданной сессии) -->
+  <Style x:Key="ReadOnlyTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource RoundedTextBoxStyle}">
+    <Setter Property="Background" Value="#F6FAFF"/>
+    <Setter Property="IsReadOnly" Value="True"/>
+  </Style>
+
+  <!-- Стиль вкладок: подчёркивание при выборе, цвет -->
+  <Style x:Key="StyledTabItem" TargetType="TabItem">
+    <Setter Property="Padding" Value="16,10"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Border x:Name="border"
+                  Background="Transparent"
+                  Padding="{TemplateBinding Padding}"
+                  BorderThickness="0,0,0,3"
+                  BorderBrush="Transparent"
+                  Cursor="Hand">
+            <ContentPresenter x:Name="contentPresenter"
+                             ContentSource="Header"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+              <Setter TargetName="contentPresenter" Property="TextElement.Foreground" Value="{StaticResource PrimaryBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="TabItem" BasedOn="{StaticResource StyledTabItem}"/>
+
+  <!-- Меню без глобальных стилей — стандартное поведение WPF (клик и подменю работают) -->
+</ResourceDictionary>

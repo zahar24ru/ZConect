@@ -1,0 +1,64 @@
+<Window x:Class="UiApp.RemoteScreenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ZConnect — Удалённый экран"
+        MinWidth="640"
+        MinHeight="420"
+        Background="#111111"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#1A1A1A" Padding="8">
+            <StackPanel Orientation="Horizontal">
+                <ComboBox Width="120"
+                          Margin="0,0,8,0"
+                          Text="{Binding ViewerRequestedQualityPreset, UpdateSourceTrigger=PropertyChanged}">
+                    <ComboBoxItem Content="Auto"/>
+                    <ComboBoxItem Content="Low"/>
+                    <ComboBoxItem Content="Medium"/>
+                    <ComboBoxItem Content="High"/>
+                </ComboBox>
+                <ComboBox Width="120"
+                          Margin="0,0,8,0"
+                          Text="{Binding ViewerRequestedDisplayMode, UpdateSourceTrigger=PropertyChanged}">
+                    <ComboBoxItem Content="Current"/>
+                    <ComboBoxItem Content="Any"/>
+                    <ComboBoxItem Content="All"/>
+                </ComboBox>
+                <ComboBox Width="180"
+                          Height="28"
+                          Margin="0,0,8,0"
+                          ItemsSource="{Binding ViewerAvailableDisplayIds}"
+                          SelectedItem="{Binding ViewerRequestedDisplayId, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Width="140"
+                        Height="28"
+                        Margin="0,0,8,0"
+                        Content="Применить"
+                        Command="{Binding ApplyRemoteVideoSettingsCommand}"/>
+                <Button Width="170"
+                        Height="28"
+                        Content="Быстрый реконнект"
+                        Command="{Binding QuickReconnectViewerCommand}"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" x:Name="RemoteScreenSurface"
+              Background="Transparent"
+              Cursor="{Binding RemoteCursor}"
+              Focusable="True"
+              MouseMove="RemoteScreenSurface_OnMouseMove"
+              MouseDown="RemoteScreenSurface_OnMouseDown"
+              MouseUp="RemoteScreenSurface_OnMouseUp"
+              MouseWheel="RemoteScreenSurface_OnMouseWheel"
+              PreviewKeyDown="RemoteScreenSurface_OnPreviewKeyDown"
+              PreviewKeyUp="RemoteScreenSurface_OnPreviewKeyUp"
+              LostKeyboardFocus="RemoteScreenSurface_OnLostKeyboardFocus">
+            <Image Source="{Binding RemoteFrameImage}" Stretch="Uniform"/>
+        </Grid>
+    </Grid>
+</Window>
+

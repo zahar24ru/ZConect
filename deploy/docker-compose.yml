@@ -1,0 +1,40 @@
+services:
+  signaling:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: zconect-signaling
+    environment:
+      SIGNALING_PORT: "${SIGNALING_PORT:-8080}"
+      SESSION_TTL_SEC: "${SESSION_TTL_SEC:-300}"
+      MAX_JOIN_ATTEMPTS: "${MAX_JOIN_ATTEMPTS:-5}"
+      LOCK_MINUTES: "${LOCK_MINUTES:-10}"
+    ports:
+      - "${SIGNALING_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: zconect-redis
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:4.6.2
+    container_name: zconect-coturn
+    command: >
+      -n
+      --log-file=stdout
+      --realm=${TURN_REALM:-zconect.local}
+      --fingerprint
+      --lt-cred-mech
+      --user=${TURN_USER:-zconect}:${TURN_PASS:-change_me}
+      --external-ip=${PUBLIC_IPV4}
+      --listening-port=3478
+      --min-port=49152
+      --max-port=49200
+      --no-tls
+      --no-dtls
+    ports:
+      - "3478:3478/udp"
+      - "49152-49200:49152-49200/udp"
+    restart: unless-stopped

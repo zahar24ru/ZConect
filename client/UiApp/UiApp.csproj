@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QualityController\QualityController.csproj" />
+    <ProjectReference Include="..\ScreenCapture\ScreenCapture.csproj" />
+    <ProjectReference Include="..\SessionClient\SessionClient.csproj" />
+    <ProjectReference Include="..\WebRtcTransport\WebRtcTransport.csproj" />
+  </ItemGroup>
+
+  <!-- Ensure native mrwebrtc.dll is present for runtime loading.
+       NuGet ships it under runtimes/win10-x64/native, but some RID graphs don't copy it automatically. -->
+  <Target Name="CopyMrWebrtcNative" AfterTargets="Build;Publish">
+    <PropertyGroup>
+      <!-- NuGetPackageRoot is not always populated under nested build hosts; UserProfile is stable on Windows. -->
+      <_MrWebrtcSrc>$(UserProfile)\.nuget\packages\microsoft.mixedreality.webrtc\2.0.2\runtimes\win10-x64\native\mrwebrtc.dll</_MrWebrtcSrc>
+      <_MrWebrtcDstBuild>$(OutDir)mrwebrtc.dll</_MrWebrtcDstBuild>
+      <_MrWebrtcDstPublish Condition="'$(PublishDir)' != ''">$(PublishDir)mrwebrtc.dll</_MrWebrtcDstPublish>
+    </PropertyGroup>
+
+    <Message Importance="High" Text="mrwebrtc: copy from $(_MrWebrtcSrc) to $(_MrWebrtcDstBuild)" Condition="Exists('$(_MrWebrtcSrc)')" />
+    <Message Importance="High" Text="mrwebrtc: source not found at $(_MrWebrtcSrc) (WebRTC will fallback to mock)" Condition="!Exists('$(_MrWebrtcSrc)')" />
+    <Copy SourceFiles="$(_MrWebrtcSrc)" DestinationFiles="$(_MrWebrtcDstBuild)" Condition="Exists('$(_MrWebrtcSrc)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(_MrWebrtcSrc)" DestinationFiles="$(_MrWebrtcDstPublish)" Condition="Exists('$(_MrWebrtcSrc)') and '$(_MrWebrtcDstPublish)' != ''" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
