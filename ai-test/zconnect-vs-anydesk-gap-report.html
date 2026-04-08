@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zconnect vs AnyDesk — Gap Report</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    .muted{color:#9fb0c8}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top}
+    th{background:#10182a}
+    ul{padding-left:22px}
+    code{background:#0a1020;color:#cde3ff;border-radius:8px;padding:2px 6px}
+  </style>
+</head>
+<body>
+  <h1>Zconnect vs AnyDesk — Gap Report</h1>
+  <p class="muted">Отдельный отчёт: чего не хватает Zconnect, чтобы приблизиться к уровню конкуренции с AnyDesk.</p>
+
+  <div class="card good">
+    <h2>Короткий вывод</h2>
+    <p>Zconnect уже выглядит как <strong>живой технический продукт</strong>, а не как просто прототип. У проекта есть клиент, сервер, signaling, ICE, удалённый экран, ввод, clipboard, file transfer, UI, лендинг и документация. Это сильная база.</p>
+    <p>Но до конкуренции с AnyDesk не хватает не одной-двух фич, а <strong>слоя зрелости продукта</strong>: стабильности, безопасности, polished UX, unattended access, релизного контура и доверия.</p>
+  </div>
+
+  <div class="card good">
+    <h2>Что у Zconnect уже есть</h2>
+    <ul>
+      <li>удалённый экран;</li>
+      <li>мышь и клавиатура;</li>
+      <li>clipboard;</li>
+      <li>file transfer;</li>
+      <li>session model;</li>
+      <li>signaling server;</li>
+      <li>ICE / WebRTC transport;</li>
+      <li>собственный UI-клиент;</li>
+      <li>GitHub + Habr + landing page.</li>
+    </ul>
+    <p>То есть проект уже <strong>не на нулевой стадии</strong>. Разрыв с AnyDesk сейчас в качестве, стабильности и зрелости, а не в полном отсутствии продукта.</p>
+  </div>
+
+  <div class="card high">
+    <h2>1. Главный разрыв: стабильность и предсказуемость runtime</h2>
+    <p>AnyDesk выигрывает не только набором фич. Он выигрывает тем, что:</p>
+    <ul>
+      <li>почти всегда соединяется;</li>
+      <li>редко ломается странным образом;</li>
+      <li>предсказуемо восстанавливается после сбоев;</li>
+      <li>у пользователя нет ощущения, что он попал в хрупкую систему.</li>
+    </ul>
+    <p>Для Zconnect это значит:</p>
+    <ul>
+      <li>меньше гонок в reconnect/reset;</li>
+      <li>более чёткая state machine;</li>
+      <li>меньше временной/таймерной «магии»;</li>
+      <li>лучшее разделение transport / UI / session states.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>2. Не хватает боевой security-модели</h2>
+    <p>Для настоящей конкуренции с AnyDesk нужна не просто работоспособность, а доверие к модели доступа.</p>
+    <p>Сейчас в проекте ещё есть слабые места:</p>
+    <ul>
+      <li>refresh/close сессии завязаны на <code>session_id</code>;</li>
+      <li>ws/auth trust model ещё не выглядит зрелой;</li>
+      <li>dangerous file operations требуют более строгой политики;</li>
+      <li>unattended access ещё не выглядит как законченный безопасный сценарий.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>3. Не хватает нормального unattended access уровня “боевой продукт”</h2>
+    <p>Для конкуренции с AnyDesk это один из ключевых пунктов.</p>
+    <p>Нужны:</p>
+    <ul>
+      <li>устойчивый unattended mode;</li>
+      <li>machine identity;</li>
+      <li>долгоживущая trust-модель;</li>
+      <li>привязка устройства;</li>
+      <li>понятное управление доступом.</li>
+    </ul>
+    <p>Если этого нет, продукт остаётся скорее инструментом для поддержки по коду, а не полной альтернативой.</p>
+  </div>
+
+  <div class="card med">
+    <h2>4. Не хватает polished UX-простоты</h2>
+    <p>У AnyDesk обычный пользователь быстро понимает:</p>
+    <ul>
+      <li>что делать;</li>
+      <li>какой код передать;</li>
+      <li>что сейчас происходит;</li>
+      <li>как скачать / установить / запустить.</li>
+    </ul>
+    <p>Zconnect уже идёт в эту сторону, но ещё нужны:</p>
+    <ul>
+      <li>более чистые главные экраны host/viewer;</li>
+      <li>лучшие connection statuses;</li>
+      <li>меньше технических состояний в UI;</li>
+      <li>лучший onboarding для новичка.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>5. Не хватает release/distribution зрелости</h2>
+    <p>AnyDesk — это ещё и продукт, который легко:</p>
+    <ul>
+      <li>скачать;</li>
+      <li>установить;</li>
+      <li>обновить;</li>
+      <li>запустить как сервис.</li>
+    </ul>
+    <p>Zconnect для серьёзной конкуренции нужны:</p>
+    <ul>
+      <li>installer;</li>
+      <li>release pipeline;</li>
+      <li>подписанные сборки;</li>
+      <li>понятная страница скачивания;</li>
+      <li>версионирование и changelog.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>6. Не хватает инфраструктурной зрелости</h2>
+    <p>У AnyDesk сила не только в клиенте. Там есть ещё:</p>
+    <ul>
+      <li>экосистема устройств;</li>
+      <li>управление доступом;</li>
+      <li>корпоративные сценарии;</li>
+      <li>инфраструктурная предсказуемость.</li>
+    </ul>
+    <p>Zconnect пока ближе к сильному техническому инструменту, чем к зрелой продуктовой платформе.</p>
+  </div>
+
+  <div class="card med">
+    <h2>7. Не хватает differentiated positioning</h2>
+    <p>Пытаться быть просто “ещё одним AnyDesk” — тяжёлый путь.</p>
+    <p>У Zconnect больше шансов, если у него будет понятная сильная позиция. Например:</p>
+    <ul>
+      <li><strong>простая open-source альтернатива для Windows</strong>;</li>
+      <li><strong>удалённая помощь по кодам без перегруженного интерфейса</strong>;</li>
+      <li><strong>self-hosted/контролируемая альтернатива</strong>;</li>
+      <li><strong>локальный/русскоязычный продукт с понятной архитектурой</strong>.</li>
+    </ul>
+  </div>
+
+  <div class="card low">
+    <h2>8. Технически у Zconnect уже сильная база</h2>
+    <p>Это важно отдельно отметить: проект не выглядит слабым. Наоборот, его фундамент уже лучше, чем у многих MVP.</p>
+    <p>Проблема не в том, что у него нет ядра. Проблема в том, что ядро ещё не доведено до уровня боевого продукта.</p>
+  </div>
+
+  <div class="card">
+    <h2>Минимальный набор, чтобы приблизиться к уровню AnyDesk</h2>
+    <table>
+      <tr><th>Направление</th><th>Что нужно</th><th>Степень важности</th></tr>
+      <tr><td>Стабильность</td><td>state machine, reconnect hardening, меньше гонок</td><td>Критично</td></tr>
+      <tr><td>Security</td><td>owner/host tokens, сильнее auth модель, ограничение dangerous ops</td><td>Критично</td></tr>
+      <tr><td>Unattended access</td><td>устойчивый persistent access с machine identity</td><td>Критично</td></tr>
+      <tr><td>UX</td><td>более простой и polished host/viewer flow</td><td>Очень важно</td></tr>
+      <tr><td>Distribution</td><td>installer, releases, update flow, signed binaries</td><td>Очень важно</td></tr>
+      <tr><td>Performance feel</td><td>latency perception, smoothness, better recovery</td><td>Очень важно</td></tr>
+      <tr><td>Trust/brand</td><td>позиционирование, прозрачность, docs, стабильные релизы</td><td>Важно</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Что бы я делал по этапам</h2>
+    <table>
+      <tr><th>Этап</th><th>Фокус</th><th>Смысл</th></tr>
+      <tr><td>Этап 1</td><td>Инженерная зрелость</td><td>Стабильность, reconnect, ICE, file transfer, security model</td></tr>
+      <tr><td>Этап 2</td><td>Продуктовая упаковка</td><td>Installer, releases, docs, download flow, demo</td></tr>
+      <tr><td>Этап 3</td><td>Дифференциация</td><td>Понять, почему пользователь выберет Zconnect вместо AnyDesk</td></tr>
+      <tr><td>Этап 4</td><td>Экосистема</td><td>Unattended access, account/device model, более зрелый product layer</td></tr>
+    </table>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>До конкуренции с AnyDesk Zconnect не хватает <strong>не столько набора фич, сколько уровня зрелости</strong>. Это хорошая новость: значит, у проекта уже есть ядро. Дальше вопрос в том, чтобы сделать его стабильным, безопасным, простым и достаточно polished, чтобы пользователь доверял ему как продукту, а не только как интересному техпроекту.</p>
+  </div>
+</body>
+</html>

@@ -4,7 +4,8 @@ public interface IPeerConnectionAgent
 {
     event Action<string>? LocalIceCandidateGenerated;
     event Action<RemoteVideoFrame>? RemoteVideoFrameReceived;
-    Task InitializeAsync(CancellationToken ct = default);
+    /// <param name="includeVideoTransceiver">Если false, видео не добавляется в SDP (режим «только передача файлов»).</param>
+    Task InitializeAsync(CancellationToken ct = default, bool includeVideoTransceiver = true);
     Task ConfigureLocalVideoAsync(LocalVideoOptions? options, CancellationToken ct = default);
     Task<string> CreateOfferAsync(CancellationToken ct = default);
     Task<string> CreateAnswerAsync(CancellationToken ct = default);

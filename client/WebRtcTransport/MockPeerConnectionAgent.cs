@@ -11,7 +11,7 @@ public sealed class MockPeerConnectionAgent : IPeerConnectionAgent
         remove { }
     }
 
-    public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
+    public Task InitializeAsync(CancellationToken ct = default, bool includeVideoTransceiver = true) => Task.CompletedTask;
     public Task ConfigureLocalVideoAsync(LocalVideoOptions? options, CancellationToken ct = default) => Task.CompletedTask;
 
     public Task<string> CreateOfferAsync(CancellationToken ct = default)

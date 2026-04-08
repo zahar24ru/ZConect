@@ -20,12 +20,21 @@ public static class QualityProfiles
         BitrateKbps = 2200
     };
 
+    public static readonly QualityProfile ExtraLow = new()
+    {
+        Name = "Extra Low",
+        Width = 640,
+        Height = 360,
+        Fps = 20,
+        BitrateKbps = 400
+    };
+
     public static readonly QualityProfile Low = new()
     {
         Name = "Low",
         Width = 854,
         Height = 480,
-        Fps = 15,
+        Fps = 20,
         BitrateKbps = 900
     };
 
@@ -51,6 +60,7 @@ public static class QualityProfiles
     {
         return preset.ToLowerInvariant() switch
         {
+            "extra low" or "extralow" => ExtraLow,
             "low" => Low,
             "medium" => Medium,
             "high" => High,

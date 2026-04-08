@@ -1,23 +1,37 @@
+using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace WebRtcTransport;
 
 public sealed class SignalingCoordinator
 {
-    private readonly WebSocketSignalingClient _signalingClient;
-    private readonly IPeerConnectionAgent _peer;
+    private WebSocketSignalingClient _signalingClient;
+    private IPeerConnectionAgent _peer;
     private readonly Action<string> _onLog;
-    private readonly Func<Task>? _beforeCreateAnswerAsync;
-    private readonly Func<string, bool>? _shouldSendLocalIceCandidate;
-    private readonly Func<string, bool>? _shouldAcceptRemoteIceCandidate;
+    private readonly Func<string, Task>? _beforeCreateAnswerAsync;
+    private Func<string, bool>? _shouldSendLocalIceCandidate;
+    private Func<string, bool>? _shouldAcceptRemoteIceCandidate;
     private string _sessionId = string.Empty;
+    private readonly List<string> _earlyLocalCandidates = new();
+    private volatile bool _answerReceived;
+    private int _iceSentCount;
+    private int _iceReceivedCount;
+
+    /// <summary>Fires when an ICE candidate is observed (direction, type, ip, port).</summary>
     public event Action<string, string, string, int>? IceCandidateObserved;
+
+    /// <summary>Fires when an answer SDP is received from the remote peer.</summary>
+    public event Action? AnswerReceived;
+
+    public bool IsAnswerReceived => _answerReceived;
 
     public SignalingCoordinator(
         WebSocketSignalingClient signalingClient,
         IPeerConnectionAgent peer,
         Action<string> onLog,
-        Func<Task>? beforeCreateAnswerAsync = null,
+        /// <param name="beforeCreateAnswerAsync">Вызывается после SetRemoteOffer(offerSdp). Параметр — SDP offer (чтобы решить, включать ли видео на host).</param>
+        Func<string, Task>? beforeCreateAnswerAsync = null,
         Func<string, bool>? shouldSendLocalIceCandidate = null,
         Func<string, bool>? shouldAcceptRemoteIceCandidate = null)
     {
@@ -32,18 +46,129 @@ public sealed class SignalingCoordinator
         _peer.LocalIceCandidateGenerated += OnLocalIceGenerated;
     }
 
+    /// <summary>Unsubscribe from signaling and peer events so a new coordinator can be attached.</summary>
+    public void Detach()
+    {
+        _signalingClient.MessageReceived -= OnMessageReceived;
+        _peer.LocalIceCandidateGenerated -= OnLocalIceGenerated;
+    }
+
+    /// <summary>Replace the underlying WS client after a reconnect. Unsubscribes from old, subscribes to new.</summary>
+    public void ReplaceSignalingClient(WebSocketSignalingClient newClient)
+    {
+        _signalingClient.MessageReceived -= OnMessageReceived;
+        _signalingClient = newClient;
+        _signalingClient.MessageReceived += OnMessageReceived;
+    }
+
+    /// <summary>Replace the peer agent (e.g. after Auto ICE re-creates WebRTC). Unsubscribes from old, subscribes to new.</summary>
+    public void ReplacePeerAgent(IPeerConnectionAgent newPeer)
+    {
+        _peer.LocalIceCandidateGenerated -= OnLocalIceGenerated;
+        _peer = newPeer;
+        _peer.LocalIceCandidateGenerated += OnLocalIceGenerated;
+    }
+
+    /// <summary>Update ICE candidate filters (used by Auto ICE between attempts).</summary>
+    public void SetIceCandidateFilters(Func<string, bool>? shouldSendLocal, Func<string, bool>? shouldAcceptRemote)
+    {
+        _shouldSendLocalIceCandidate = shouldSendLocal;
+        _shouldAcceptRemoteIceCandidate = shouldAcceptRemote;
+    }
+
     public async Task StartAsCallerAsync(string sessionId, CancellationToken ct = default)
     {
         _sessionId = sessionId;
+        _answerReceived = false;
+        _iceSentCount = 0;
+        _iceReceivedCount = 0;
         var sdp = await _peer.CreateOfferAsync(ct);
         await _signalingClient.SendAsync("offer", _sessionId, new { sdp }, ct);
         _onLog("offer_sdp_" + SummarizeSdp(sdp));
         _onLog("offer_sent");
+
+        // Flush any ICE candidates that were generated before SetSession/StartAsCaller
+        FlushEarlyCandidates();
+    }
+
+    /// <summary>
+    /// Trigger an ICE restart on the existing PeerConnection by creating a new offer
+    /// with fresh ice-ufrag/ice-pwd. This forces both sides to re-gather ICE candidates
+    /// while keeping media/data channels alive. Zero disruption.
+    /// </summary>
+    public async Task StartIceRestartAsCallerAsync(string sessionId, CancellationToken ct = default)
+    {
+        _sessionId = sessionId;
+        _answerReceived = false;
+        var sdp = await _peer.CreateOfferAsync(ct);
+
+        // Force ICE restart by replacing ice-ufrag and ice-pwd with new random values.
+        // This tells the remote peer to discard old ICE state and gather new candidates.
+        sdp = ForceIceRestart(sdp);
+
+        await _signalingClient.SendAsync("offer", _sessionId, new { sdp }, ct);
+        _onLog("ice_restart_offer_sdp_" + SummarizeSdp(sdp));
+        _onLog("ice_restart_offer_sent");
+        FlushEarlyCandidates();
+    }
+
+    private static string ForceIceRestart(string sdp)
+    {
+        var newUfrag = GenerateIceString(8);
+        var newPwd = GenerateIceString(24);
+        sdp = Regex.Replace(sdp, @"a=ice-ufrag:\S+", $"a=ice-ufrag:{newUfrag}");
+        sdp = Regex.Replace(sdp, @"a=ice-pwd:\S+", $"a=ice-pwd:{newPwd}");
+        return sdp;
+    }
+
+    private static string GenerateIceString(int length)
+    {
+        const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";
+        var bytes = RandomNumberGenerator.GetBytes(length);
+        var result = new char[length];
+        for (var i = 0; i < length; i++)
+            result[i] = chars[bytes[i] % chars.Length];
+        return new string(result);
     }
 
     public void SetSession(string sessionId)
     {
         _sessionId = sessionId;
+        FlushEarlyCandidates();
+    }
+
+    private async void FlushEarlyCandidates()
+    {
+        List<string> buffered;
+        lock (_earlyLocalCandidates)
+        {
+            if (_earlyLocalCandidates.Count == 0) return;
+            buffered = new List<string>(_earlyLocalCandidates);
+            _earlyLocalCandidates.Clear();
+        }
+
+        if (string.IsNullOrWhiteSpace(_sessionId)) return;
+
+        foreach (var candidate in buffered)
+        {
+            try
+            {
+                if (_shouldSendLocalIceCandidate is not null && !_shouldSendLocalIceCandidate(candidate))
+                    continue;
+
+                await _signalingClient.SendAsync("ice", _sessionId, new { candidate, sdpMid = "0", sdpMLineIndex = 0 });
+                IceCandidateObserved?.Invoke(
+                    "local",
+                    GetIceCandidateType(candidate),
+                    GetIceCandidateIp(candidate),
+                    GetIceCandidatePort(candidate));
+                _onLog("ice_flushed_early");
+            }
+            catch (Exception ex)
+            {
+                _onLog("ice_flush_early_failed:" + ex.Message);
+            }
+        }
     }
 
     private async void OnMessageReceived(SignalingMessage msg)
@@ -56,10 +181,9 @@ public sealed class SignalingCoordinator
                 if (!string.IsNullOrWhiteSpace(sdp))
                 {
                     await _peer.SetRemoteOfferAsync(sdp);
-                    // Important: run hook after applying remote offer so transceivers become associated.
                     if (_beforeCreateAnswerAsync is not null)
                     {
-                        await _beforeCreateAnswerAsync();
+                        await _beforeCreateAnswerAsync(sdp);
                     }
                     var answer = await _peer.CreateAnswerAsync();
                     await _signalingClient.SendAsync("answer", msg.SessionId, new { sdp = answer });
@@ -75,6 +199,8 @@ public sealed class SignalingCoordinator
                 if (!string.IsNullOrWhiteSpace(sdp))
                 {
                     await _peer.SetRemoteAnswerAsync(sdp);
+                    _answerReceived = true;
+                    AnswerReceived?.Invoke();
                     _onLog("answer_received_sdp_" + SummarizeSdp(sdp));
                     _onLog("answer_received");
                 }
@@ -97,7 +223,9 @@ public sealed class SignalingCoordinator
                         GetIceCandidateType(candidate),
                         GetIceCandidateIp(candidate),
                         GetIceCandidatePort(candidate));
-                    _onLog("ice_received");
+                    var rcvCount = Interlocked.Increment(ref _iceReceivedCount);
+                    if (rcvCount <= 2 || rcvCount % 10 == 0)
+                        _onLog($"ice_received (#{rcvCount})");
                 }
             }
         }
@@ -111,6 +239,12 @@ public sealed class SignalingCoordinator
     {
         if (string.IsNullOrWhiteSpace(_sessionId))
         {
+            // Buffer early candidates — they'll be flushed when session ID is set
+            lock (_earlyLocalCandidates)
+            {
+                _earlyLocalCandidates.Add(candidate);
+            }
+            _onLog("ice_buffered_early");
             return;
         }
         if (_shouldSendLocalIceCandidate is not null && !_shouldSendLocalIceCandidate(candidate))
@@ -124,7 +258,9 @@ public sealed class SignalingCoordinator
             GetIceCandidateType(candidate),
             GetIceCandidateIp(candidate),
             GetIceCandidatePort(candidate));
-        _onLog("ice_sent");
+        var count = Interlocked.Increment(ref _iceSentCount);
+        if (count <= 2 || count % 10 == 0)
+            _onLog($"ice_sent (#{count})");
     }
 
     private static string TryGetString(JsonElement payload, string key)
@@ -138,7 +274,6 @@ public sealed class SignalingCoordinator
 
     private static string SummarizeSdp(string sdp)
     {
-        // Avoid logging full SDP; only emit minimal codec/sections hints for troubleshooting.
         var hasVideo = sdp.Contains("m=video", StringComparison.OrdinalIgnoreCase);
         var hasAudio = sdp.Contains("m=audio", StringComparison.OrdinalIgnoreCase);
         var hasVp8 = sdp.Contains("VP8", StringComparison.OrdinalIgnoreCase);
@@ -151,8 +286,6 @@ public sealed class SignalingCoordinator
 
     private static string FindMediaDirection(string sdp, string media)
     {
-        // Extract "a=sendrecv/recvonly/sendonly/inactive" for given m= section.
-        // Not a full SDP parser; good enough for quick diagnostics.
         var lines = sdp.Split('\n');
         var inSection = false;
         foreach (var raw in lines)
@@ -163,10 +296,7 @@ public sealed class SignalingCoordinator
                 inSection = line.StartsWith("m=" + media, StringComparison.OrdinalIgnoreCase);
                 continue;
             }
-            if (!inSection)
-            {
-                continue;
-            }
+            if (!inSection) continue;
             if (line.Equals("a=sendrecv", StringComparison.OrdinalIgnoreCase)) return "sendrecv";
             if (line.Equals("a=recvonly", StringComparison.OrdinalIgnoreCase)) return "recvonly";
             if (line.Equals("a=sendonly", StringComparison.OrdinalIgnoreCase)) return "sendonly";
@@ -177,22 +307,10 @@ public sealed class SignalingCoordinator
 
     private static string GetIceCandidateType(string candidate)
     {
-        if (candidate.Contains(" typ relay", StringComparison.OrdinalIgnoreCase))
-        {
-            return "relay";
-        }
-        if (candidate.Contains(" typ srflx", StringComparison.OrdinalIgnoreCase))
-        {
-            return "srflx";
-        }
-        if (candidate.Contains(" typ prflx", StringComparison.OrdinalIgnoreCase))
-        {
-            return "prflx";
-        }
-        if (candidate.Contains(" typ host", StringComparison.OrdinalIgnoreCase))
-        {
-            return "host";
-        }
+        if (candidate.Contains(" typ relay", StringComparison.OrdinalIgnoreCase)) return "relay";
+        if (candidate.Contains(" typ srflx", StringComparison.OrdinalIgnoreCase)) return "srflx";
+        if (candidate.Contains(" typ prflx", StringComparison.OrdinalIgnoreCase)) return "prflx";
+        if (candidate.Contains(" typ host", StringComparison.OrdinalIgnoreCase)) return "host";
         return "unknown";
     }
 
@@ -200,17 +318,10 @@ public sealed class SignalingCoordinator
     {
         try
         {
-            // candidate:<foundation> <component> <transport> <priority> <ip> <port> typ <type> ...
             var parts = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 6)
-            {
-                return parts[4];
-            }
+            if (parts.Length >= 6) return parts[4];
         }
-        catch
-        {
-            // ignore
-        }
+        catch { /* ignore */ }
         return "n/a";
     }
 
@@ -219,15 +330,9 @@ public sealed class SignalingCoordinator
         try
         {
             var parts = candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 6 && int.TryParse(parts[5], out var port))
-            {
-                return port;
-            }
+            if (parts.Length >= 6 && int.TryParse(parts[5], out var port)) return port;
         }
-        catch
-        {
-            // ignore
-        }
+        catch { /* ignore */ }
         return 0;
     }
 }

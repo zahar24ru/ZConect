@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZConect — отчёт по ревью проекта</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif; line-height: 1.45; margin: 24px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 12px; font-size: 22px; }
+    h2 { margin: 22px 0 10px; font-size: 18px; }
+    h3 { margin: 16px 0 8px; font-size: 15px; }
+    .meta { color: #666; font-size: 12px; margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .card { border: 1px solid rgba(127,127,127,.35); border-radius: 10px; padding: 12px 14px; background: rgba(127,127,127,.06); }
+    .sev { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .sev.crit { background: #7f1d1d; color: #fff; }
+    .sev.high { background: #9a3412; color: #fff; }
+    .sev.med { background: #92400e; color: #fff; }
+    .sev.low { background: #1f2937; color: #fff; }
+    .file { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    ul { margin: 6px 0 0 20px; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    pre { padding: 10px 12px; border-radius: 10px; overflow: auto; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.05); }
+    .ok { color: #065f46; font-weight: 700; }
+    .warn { color: #92400e; font-weight: 700; }
+    .bad { color: #991b1b; font-weight: 700; }
+    .muted { color: #666; }
+    .k { font-weight: 700; }
+    .small { font-size: 12px; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <h1>ZConect — глубокий анализ проекта (статическое ревью)</h1>
+  <div class="meta">
+    <div><span class="k">Проект:</span> <span class="file">romantic-noyce</span></div>
+    <div><span class="k">Дата отчёта:</span> 2026-04-07</div>
+    <div><span class="k">Состав:</span> сервер Go (<span class="file">server/</span>), клиент WPF .NET 8 (<span class="file">client/</span>)</div>
+  </div>
+
+  <h2>Короткое резюме</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="bad">Есть 2 логических дефекта в управлении сессиями на сервере, которые могут ломать безопасность/ожидаемое поведение (закрытые сессии потенциально можно “поднять” через join; утечки индексов по machine_id).</div>
+      <div class="warn" style="margin-top:8px;">В клиенте есть несколько источников “тихих” сбоев: <code>async void</code> обработчики и широкие <code>catch { /* ignore */ }</code>, а также принудительный <code>Environment.Exit(0)</code>.</div>
+      <div class="muted small" style="margin-top:8px;">Примечание: запуск <code>go test</code> в текущей среде не выполнен — команда <code>go</code> не найдена (Go SDK не установлен/не в PATH). Это отражено ниже как ограничение проверки.</div>
+    </div>
+  </div>
+
+  <h2>Результаты сборки/проверок</h2>
+  <div class="card">
+    <h3>.NET (client)</h3>
+    <ul>
+      <li><span class="ok">Сборка успешна</span>: <span class="file">dotnet build client/UiApp/UiApp.sln -c Release</span></li>
+      <li><span class="warn">Предупреждение</span>: <span class="file">NETSDK1206</span> — обнаружены RID <span class="file">win10-x64, win10-x86</span> у зависимости <span class="file">Microsoft.MixedReality.WebRTC</span>. Риск: в .NET 8+ ресурсы version-specific RID могут не резолвиться по умолчанию.</li>
+    </ul>
+    <h3>Go (server)</h3>
+    <ul>
+      <li><span class="warn">Ограничение окружения</span>: <span class="file">go test ./...</span> не выполнен, т.к. <span class="file">go</span> не найден в системе.</li>
+    </ul>
+  </div>
+
+  <h2>Ошибки и риски (для исправления)</h2>
+
+  <div class="card">
+    <div><span class="sev crit">CRITICAL</span> <span class="k">Закрытие сессии не разрывает привязку логина → session_id</span></div>
+    <div class="small muted">Симптом: после <code>POST /api/v1/session/close</code> логин-код остаётся в <span class="file">sessionByLogin</span>. Метод <code>Join</code> не проверяет <code>StateClosed</code>, поэтому закрытую, но ещё не истёкшую сессию можно снова “подключить”.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">server/internal/session/service.go</span> — <code>Close()</code> и <code>Join()</code></div>
+    <pre><code>// Close(): не удаляет sessionByLogin[loginCode]
+// Join(): не проверяет sess.State == StateClosed</code></pre>
+    <div><span class="k">Рекомендация:</span> в <code>Close()</code> удалять индекс <span class="file">sessionByLogin</span> (и, по желанию, <span class="file">sessionsByID</span>), либо в <code>Join()</code> явно отвергать <code>StateClosed</code> (и/или переводить <code>ExpiresAt</code> в прошлое при close).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev crit">CRITICAL</span> <span class="k">PruneExpired не чистит индекс machine_id → session_id</span></div>
+    <div class="small muted">Симптом: <code>PruneExpired()</code> удаляет только <span class="file">sessionsByID</span> и <span class="file">sessionByLogin</span>, но не <span class="file">sessionByMachine</span>. Это приводит к “висячим” ссылкам и потенциально неверному reuse сессий при <code>CreateWithOpts(MachineID)</code>.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">server/internal/session/prune.go</span></div>
+    <div><span class="k">Рекомендация:</span> при удалении сессии также удалять <span class="file">sessionByMachine[sess.MachineID]</span>, если <code>MachineID</code> задан.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">WS токен передаётся в query string</span></div>
+    <div class="small muted">Риск: токены в URL часто попадают в логи прокси/балансировщиков, в историю, в телеметрию, могут утечь через реферер при редиректах (в браузерном мире) и т.п. Для desktop‑клиента риск ниже, но на бою лучше не закреплять паттерн.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">server/internal/signaling/handler.go</span> (берёт <code>?token=</code>)</div>
+    <div><span class="k">Рекомендация:</span> перенос токена в заголовок (например, <code>Authorization: Bearer</code>) или в <code>Sec-WebSocket-Protocol</code>, либо выдавать одноразовый WS-токен и логировать URL без query.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">X-Forwarded-For используется без нормализации</span></div>
+    <div class="small muted">Риск: rate limit можно обходить/ломать подставным <code>X-Forwarded-For</code>, если сервис доступен напрямую (не только за доверенным прокси) или если прокси не очищает заголовок.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">server/internal/ratelimit/ratelimit.go</span> (<code>extractIP</code>)</div>
+    <div><span class="k">Рекомендация:</span> доверять <code>X-Forwarded-For</code> только если запрос пришёл от доверенного reverse-proxy (allowlist подсетей) и парсить первый IP через строгий парсер (<code>net.ParseIP</code>).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">panic на старте сервера / генерации секретов</span></div>
+    <div class="small muted">Риск: неуправляемое завершение процесса вместо корректного лога/выхода с кодом/метрики. На сервере лучше “проваливаться” с понятной причиной, но без паники (или хотя бы логировать через stderr и выходить).</div>
+    <div style="margin-top:8px;">
+      <div><span class="k">Где:</span> <span class="file">server/cmd/signaling/main.go</span> (ошибка logger) и <span class="file">server/internal/auth/token.go</span> (ошибка <code>rand.Read</code>).</div>
+    </div>
+    <div><span class="k">Рекомендация:</span> заменить <code>panic</code> на возврат ошибки/лог + <code>os.Exit(1)</code> (или поднять ошибку до main), чтобы поведение было предсказуемым.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Игнорирование ошибок в критических местах</span></div>
+    <div class="small muted">Это усложняет диагностику и маскирует деградацию. Примеры: <code>server.Shutdown</code>, <code>json.Encoder.Encode</code>, <code>Conn.Set*Deadline</code>, <code>file.Write</code>, <code>w.Write</code>.</div>
+    <div style="margin-top:8px;"><span class="k">Где (примеры):</span> <span class="file">server/cmd/signaling/main.go</span>, <span class="file">server/internal/api/handler.go</span>, <span class="file">server/internal/signaling/handler.go</span>, <span class="file">server/internal/logging/logger.go</span>, <span class="file">server/internal/ratelimit/ratelimit.go</span></div>
+    <div><span class="k">Рекомендация:</span> не обязательно “везде возвращать ошибку наверх”, но логировать (с rate-limit на логи) там, где ошибка может менять поведение.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Client: async void (кроме UI event handlers) + риск неотловленных исключений</span></div>
+    <div class="small muted">В WPF <code>async void</code> допустим для событий, но в инфраструктуре/координаторах это делает ошибки “тихими” и плохо тестируемыми. В частности, в <span class="file">WebRtcTransport/SignalingCoordinator.cs</span> обработчики и flush — <code>async void</code> и ловят исключения, но продолжают выполнение без сигнализации наверх.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/SignalingCoordinator.cs</span> (<code>FlushEarlyCandidates</code>, <code>OnMessageReceived</code>, <code>OnLocalIceGenerated</code>), <span class="file">client/UiApp/Commands/RelayCommand.cs</span> (<code>AsyncRelayCommand.Execute</code>)</div>
+    <div><span class="k">Рекомендация:</span> перевести на <code>Task</code>-цепочки (или очередь/канал обработки сообщений), а в <code>ICommand</code> — централизованно логировать исключения и показывать UI-ошибку.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Client: принудительный Environment.Exit(0) при закрытии окна</span></div>
+    <div class="small muted">Риск: обрываются фоновые операции (файлы/лог/WS), могут не успеть отработать <code>Dispose</code>, возможна потеря данных/неконсистентное состояние. Также “глушит” проблему, если приложение зависает при корректном shutdown.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/MainWindow.xaml.cs</span> (<code>OnClosingAsync</code>)</div>
+    <div><span class="k">Рекомендация:</span> фиксировать первопричину зависаний (если они были) и уходить на штатный <code>Application.Current.Shutdown()</code> без <code>Environment.Exit</code>. Если нужен “hard-exit”, оставить как fallback по таймауту, но с логом причины.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev crit">CRITICAL</span> <span class="k">File Transfer: потенциальная запись файла в произвольное место (path traversal / arbitrary write)</span></div>
+    <div class="small muted">
+      На приёме файла путь назначения строится из <code>TargetDirectory</code> и/или <code>RelativePath</code>, пришедших с удалённой стороны.
+      Сейчас нет нормализации/ограничения корня: можно подсунуть <code>..</code>, абсолютный путь, UNC-путь и т.п., и записать файл вне “папки полученных”.
+      Это особенно критично, т.к. приложение часто запускается с админ‑правами.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/FileTransfer/FileTransferService.cs</span> — <code>OnFileEndReceived</code> (формирование <code>saveDir</code>/<code>finalPath</code>)</div>
+    <pre><code>// saveDir берётся из payload.TargetDirectory (удалённая сторона управляет!)
+// finalPath = Path.Combine(saveDir, state.RelativePath ...)</code></pre>
+    <div><span class="k">Рекомендация:</span> принимать только “безопасный относительный путь” (без <code>..</code>, без двоеточий/UNC, без ведущих слешей), а итоговый путь валидировать через <code>Path.GetFullPath</code> и проверку, что он лежит внутри разрешённого корня (например, папки приёма).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev crit">CRITICAL</span> <span class="k">Remote File Panel (host): удалённая сторона может читать/удалять файлы и создавать папки по произвольным путям</span></div>
+    <div class="small muted">
+      Обработчики запросов через data channel (<code>dir_list_request</code>, <code>file_request</code>, <code>delete_request</code>, <code>create_folder_request</code>) принимают “путь как есть” и выполняют операции ФС.
+      Сейчас нет аутентификации на уровне команд, нет ограничений по разрешённым директориям, нет подтверждения со стороны пользователя host.
+      В итоге viewer (или злоумышленник, получивший доступ к каналу) потенциально может:
+      1) запросить отправку любого файла (<code>file_request</code>), 2) удалить любой файл/папку (<code>delete_request</code>), 3) создавать каталоги в произвольных местах.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.FileTransfer.cs</span> — <code>OnDirListRequestReceived</code>, <code>OnFileRequestReceived</code>, <code>OnDeleteRequestReceived</code>, <code>OnCreateFolderRequestReceived</code></div>
+    <div><span class="k">Рекомендация:</span> ввести “sandbox” (разрешённые корни, например только выбранная папка/Downloads), обязательное подтверждение для опасных операций (delete / отправка файла), и строгую нормализацию пути (reject абсолютных/UNC/с <code>..</code>).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">FileTransferService: fire-and-forget вызов ProcessQueueAsync сделан некорректно</span></div>
+    <div class="small muted">
+      В <code>EnqueueSend</code> и <code>EnqueueSendFolder</code> используется <code>ProcessQueueAsync().ConfigureAwait(false);</code> без <code>await</code> и без присваивания в <code>_ =</code>.
+      Это выглядит как попытка “запустить фоном”, но в текущем виде легко потерять исключения и сделать поведение зависимым от деталей планировщика.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/FileTransfer/FileTransferService.cs</span> — <code>EnqueueSend</code>, <code>EnqueueSendFolder</code></div>
+    <div><span class="k">Рекомендация:</span> заменить на <code>_ = ProcessQueueAsync();</code> (и логировать исключения внутри), либо явно возвращать <code>Task</code> наружу и await’ить из UI/VM слоя.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Remote dir list: расчёт размера папки может “убить” поток обработки сообщений</span></div>
+    <div class="small muted">
+      <code>GetDirectorySizeSafe</code> делает <code>EnumerateFiles(..., AllDirectories).Sum(...)</code>, что на больших/сетевых каталогах может занять секунды/минуты.
+      Это выполняется прямо в обработчике входящего сообщения и может приводить к лагам/таймаутам/потере responsiveness.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.FileTransfer.cs</span> — <code>GetDirectorySizeSafe</code> и вызов при листинге директорий</div>
+    <div><span class="k">Рекомендация:</span> убрать размер папки из ответа (или сделать опциональным), либо считать его асинхронно/постепенно с лимитами и кешем.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Захват/передача видео: блокировка потока захвата из‑за Sleep внутри lock</span></div>
+    <div class="small muted">
+      В цикле захвата кадра есть участок, который берёт <code>lock (_captureSync)</code> и при отсутствии настроек/буферов делает <code>Thread.Sleep(10)</code>, не отпуская lock.
+      Это может блокировать конкурентные операции, которым тоже нужен этот lock (например, коллбек выдачи кадра в WebRTC), что проявляется как “дёрганье”, периодические паузы или зависание кадра при реконфиге.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</span> — <code>CaptureLoopThread()</code></div>
+    <div><span class="k">Рекомендация:</span> не спать под lock: вынести проверку/ожидание за пределы <code>lock</code>, либо использовать <code>Monitor.Wait/Pulse</code> или <code>ManualResetEventSlim</code> для сигнализации “ресурсы готовы”.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Захват/передача видео: тяжёлый путь масштабирования через GDI Bitmap на каждый кадр</span></div>
+    <div class="small muted">
+      При масштабировании (DXGI single/multi) создаётся <code>Bitmap</code> на основе сырого буфера (<code>using var srcBmp = new Bitmap(...)</code>) и затем выполняется <code>DrawImage</code> + <code>LockBits</code> + <code>Marshal.Copy</code> в буфер кадра.
+      Это даёт существенную нагрузку на CPU/GDI, большое количество unmanaged объектов и может стать узким местом при 30fps+ или высоких разрешениях.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</span> — <code>CaptureDxgi()</code>/<code>CaptureDxgiMulti()</code> (ветки scaling)</div>
+    <div><span class="k">Рекомендация:</span> перейти на GPU scaling (D3D11 shader/CopySubresourceRegion), либо на более лёгкий CPU scaler без GDI, либо хотя бы реюзать объекты и минимизировать <code>Bitmap</code>/<code>Graphics</code> churn.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Viewer: двойное копирование кадров (unmanaged → managed → WriteableBitmap)</span></div>
+    <div class="small muted">
+      На viewer стороне кадр копируется из unmanaged указателя в managed byte[] (<code>Marshal.Copy</code>), затем ещё раз копируется в backbuffer <code>WriteableBitmap</code> на UI потоке.
+      Это увеличивает задержку, загрузку CPU и давление на GC при высоких FPS/разрешениях (даже с маленьким пулом).
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</span> — <code>OnArgb32RemoteVideoFrameReady</code>, и <span class="file">client/UiApp/ViewModels/MainViewModel.Video.cs</span> — <code>OnRemoteVideoFrameReceived</code></div>
+    <div><span class="k">Рекомендация:</span> рассмотреть прямую отрисовку через D3D shared texture / D3DImage (минимум копий), либо “последний кадр” с дропом промежуточных (backpressure), чтобы UI не захлёбывался.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Viewer: риск накапливания UI-постов при перегрузке (нет backpressure)</span></div>
+    <div class="small muted">
+      Для каждого принятого кадра делается <code>_uiContext.Post(...)</code>. Если UI поток не успевает (ресайз окна, GC, нагрузка), очередь сообщений растёт — увеличивается latency, появляются “рывки” (старые кадры рисуются позже).
+      Пул буферов ограничен (<code>Count &lt; 4</code>), поэтому при накоплении постов начнутся новые аллокации.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Video.cs</span> — <code>OnRemoteVideoFrameReceived</code>, <span class="file">client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</span> — пул <code>_viewerBufferPool</code></div>
+    <div><span class="k">Рекомендация:</span> сделать стратегию “рисовать только последний кадр”: хранить <code>latestFrame</code>, ставить флаг <code>renderScheduled</code> и планировать максимум один UI update за тик/кадр.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev crit">CRITICAL</span> <span class="k">Host: удалённая сторона может инициировать опасные действия (SAS Ctrl+Alt+Del) без подтверждения</span></div>
+    <div class="small muted">
+      При получении сообщения <code>ctrl_alt_del</code> host вызывает <code>WindowsInputInjectionService.SendCtrlAltDel()</code>.
+      Внутри сервис также пытается выставить системную политику реестра <code>SoftwareSASGeneration</code>, чтобы разрешить генерацию SAS.
+      Это действие повышает привилегии удалённого управления на хосте и должно быть под явным контролем пользователя.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span>
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>OnCtrlAltDelReceived</code>,
+      <span class="file">client/UiApp/Services/WindowsInputInjectionService.cs</span> — <code>SendCtrlAltDel</code>/<code>EnsureSoftwareSasPolicy</code>
+    </div>
+    <div><span class="k">Рекомендация:</span> добавить подтверждение на host (и/или флажок “разрешить Ctrl+Alt+Del” по умолчанию выключен), логировать попытки, а изменение политики реестра делать только по явной команде пользователя (не “молчаливо” из сетевого события).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Host: удалённая сторона может инициировать удалённое управление вводом без явной “сессии доверия”</span></div>
+    <div class="small muted">
+      При режиме host обработчики <code>MouseReceived</code>/<code>KeyboardReceived</code> сразу инжектят ввод через WinAPI.
+      В текущем протоколе (data channel) нет отдельной авторизации/капабилити‑флага на “управление вводом” (всё держится на факте установления WebRTC).
+      При расширении функциональности (адресная книга/персистентные host‑сессии) это важно явно моделировать.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>WireUpDataChannelCoordinator(role==Host)</code>,
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>OnMouseInputReceived</code>/<code>OnKeyboardInputReceived</code>
+    </div>
+    <div><span class="k">Рекомендация:</span> ввести явный “grant control” на host (подтверждение/таймаут/ревокация), и возможность “только просмотр/только файлы” на уровне разрешений команд data channel.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Host: чувствительные данные (коды/последняя сессия) сохраняются в AppData в открытом виде</span></div>
+    <div class="small muted">
+      В <code>ClientSettings</code> сохраняются <code>LastSessionId</code>, <code>LastLoginCode</code>, <code>LastPassCode</code>, а также <code>MachineId</code>.
+      Это упрощает UX, но увеличивает риск при компрометации профиля пользователя/малвари: можно восстановить коды, понять наличие активной “unattended” конфигурации и т.п.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/Services/SettingsService.cs</span>, <span class="file">client/UiApp/Models/ClientSettings.cs</span>,
+      запись выполняется из <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span>
+    </div>
+    <div><span class="k">Рекомендация:</span> хранить минимум необходимого; для секретов использовать DPAPI (<code>ProtectedData</code>) или шифрование, либо не сохранять <code>LastPassCode</code> вообще (только session_id + machine_id, если сервер поддерживает переиспользование).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Host: WS-reconnect вызывает RefreshSession (может неожиданно ротировать пароль/TTL)</span></div>
+    <div class="small muted">
+      В <code>WsReconnectLoopAsync</code> перед переподключением WS вызывается <code>RefreshSessionAsync</code> для получения нового <code>ws_token</code>.
+      На сервере refresh также меняет <code>pass_code</code> и продлевает TTL. Это может быть неожиданным побочным эффектом “просто переподключить WS”.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>WsReconnectLoopAsync</code>, <span class="file">client/SessionClient/SessionApiClient.cs</span></div>
+    <div><span class="k">Рекомендация:</span> выделить отдельный endpoint “refresh ws_token” без ротации пароля (или добавить флаг), либо на клиенте явно учитывать, что refresh меняет пароль (обновлять UI/копирование/историю и т.п.).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">ICE upgrade: монитор заявлен “для обоих ролей”, но запускается только у viewer</span></div>
+    <div class="small muted">
+      <code>StartIceUpgradeMonitor()</code> содержит явную проверку <code>if (_role != Viewer) return;</code>, однако комментарии у <code>IceUpgradeMonitorLoopAsync</code> говорят “Works for both Viewer and Host roles”
+      и внутри цикла есть проверки допускающие <code>Host</code>. Это рассинхрон документации/логики и часто признак недоделанного поведения: host никогда не будет инициировать улучшение маршрута (что ок), но код “как будто” это поддерживает.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>StartIceUpgradeMonitor</code>, <code>IceUpgradeMonitorLoopAsync</code></div>
+    <div><span class="k">Рекомендация:</span> либо чётко задокументировать “только viewer инициирует ICE restart”, либо расширить дизайн, если планировалось иначе (например, host может инициировать restart при деградации).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">ICE upgrade: GetAdaptiveInterval принимает RTT, но не использует его</span></div>
+    <div class="small muted">
+      Метод <code>GetAdaptiveInterval(route, consecutiveRelayCount, rttMs)</code> игнорирует <code>rttMs</code>. В результате логика “RTT drops/degrades” фактически не влияет на частоту проверок,
+      и модель “адаптивности” работает только по счётчику relay.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>GetAdaptiveInterval</code></div>
+    <div><span class="k">Рекомендация:</span> либо убрать параметр (чтобы не вводить в заблуждение), либо реально использовать RTT (например, чаще проверять при высоком RTT/джиттере даже на srflx, или при деградации на “оптимальном” маршруте).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">ICE upgrade: возможна гонка по sessionId при переподключении/новой сессии</span></div>
+    <div class="small muted">
+      В монитор передаётся строковый <code>sessionId</code> параметром и он используется в цикле/ICE restart.
+      При реконнекте/смене сессии <code>_currentSessionId</code> меняется, но монитор может продолжить работать со старым sessionId, если его не отменили вовремя.
+      Частично это нивелируется отменой через <code>_lifetimeCts</code>, но это всё равно хрупко при сложных сценариях (быстрый reconnect + новый join/create).
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>StartIceUpgradeMonitor(sessionId, ct)</code>, <code>IceUpgradeMonitorLoopAsync(sessionId,...)</code>, <code>PerformIceRestartAsync(sessionId,...)</code></div>
+    <div><span class="k">Рекомендация:</span> внутри цикла сверять <code>sessionId</code> с <code>_currentSessionId</code> и выходить, если они разошлись; аналогично перед каждым restart.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">ICE route detection основан на “наблюдаемых” типах кандидатов, а не на реально выбранной паре</span></div>
+    <div class="small muted">
+      <code>_localIceCandidateType/_remoteIceCandidateType</code> обновляются из <code>IceCandidateObserved</code> и по сути являются эвристикой (“лучший увиденный тип”).
+      Затем <code>InferRouteType</code> принимает решение по этим двум строкам. Это может ошибаться относительно фактического маршрута (selected candidate pair),
+      а значит может ошибочно:
+      - не запускать upgrade, когда реально сидим на TURN,
+      - либо запускать restart, когда маршрут уже хороший,
+      - либо показывать неверный статус в UI.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Ice.cs</span> — <code>OnIceCandidateObserved</code>/<code>InferRouteType</code>,
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — использование <code>InferRouteType</code> в Auto ICE и upgrade monitor
+    </div>
+    <div><span class="k">Рекомендация:</span> определять маршрут по stats/selected candidate pair (например, через WebRTC stats / selectedCandidatePairId), а “observed candidates” оставить только как debug‑подсказку.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">ICE upgrade: обновление типа кандидатов происходит через UI-post → задержка/рассинхрон с монитором</span></div>
+    <div class="small muted">
+      <code>OnIceCandidateObserved</code> делает <code>_uiContext.Post(...)</code>, и уже внутри поста обновляет поля маршрута.
+      Монитор <code>IceUpgradeMonitorLoopAsync</code> читает эти поля в фоновом потоке. Если UI поток загружен, обновления кандидатов будут приходить с задержкой,
+      а monitor будет опираться на устаревшие значения, что повышает вероятность ложных “unknown” и неверных решений.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Ice.cs</span>, <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span></div>
+    <div><span class="k">Рекомендация:</span> отделить “логирование/обновление UI” от “обновления состояния маршрута”: состояние обновлять в вызывающем потоке (thread-safe), а UI текст — отдельно постить.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Viewer: отправка ввода запускается через Task.Run на каждое событие (риск перегруза/очередей)</span></div>
+    <div class="small muted">
+      <code>HandleRemoteSurfaceMouseMove/Down/Up/Wheel</code> и клавиатура вызывают <code>SafeSendMouseAsync/SafeSendKeyboardAsync</code>,
+      которые внутри делают <code>Task.Run(async () =&gt; ...)</code> на каждое событие. При высокой частоте (move, wheel, key repeat)
+      это может создавать лавину задач, повышать latency и ухудшать стабильность канала (особенно на слабых CPU).
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>SafeSendMouseAsync</code>, <code>SafeSendKeyboardAsync</code></div>
+    <div><span class="k">Рекомендация:</span> заменить на один сериализованный sender-loop (Channel/BlockingCollection) или хотя бы не использовать Task.Run для уже async методов (вызывать <code>dc.Send*</code> напрямую с throttling/coalescing).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Viewer: отсутствует backpressure/coalescing для мыши (кроме 16мс throttle)</span></div>
+    <div class="small muted">
+      Есть только ограничение по времени (16мс) и фильтр “те же координаты”, но при перегрузке/плохой сети задачи на отправку всё равно накапливаются.
+      В итоге host может получать “устаревшие” движения, а управление станет дерганым.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>HandleRemoteSurfaceMouseMove</code></div>
+    <div><span class="k">Рекомендация:</span> хранить только “последнюю позицию” и отправлять её с фиксированным тикером (например 60Гц) или по готовности канала; при перегрузе — дропать промежуточные.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Viewer: возможны “залипшие клавиши” при сетевых сбоях/потере фокуса</span></div>
+    <div class="small muted">
+      Viewer ведёт локальный набор нажатых VK и при потере фокуса пытается отправить “key up” для всех.
+      Но отправка — fire-and-forget и может не дойти (канал закрывается/lag), а host продолжит считать клавишу зажатой.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>ReleaseAllPressedKeys</code>, <code>HandleRemoteSurfaceLostFocus</code></div>
+    <div><span class="k">Рекомендация:</span> добавить протокол “reset input state” (на host стороне очистить/отпустить модификаторы по спец-команде), либо периодический watchdog на host (если нет input N секунд — отпустить).</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Viewer: подключение не учитывает require_confirm от сервера/хоста</span></div>
+    <div class="small muted">
+      API join возвращает <code>require_confirm</code>, но viewer-ветка не делает отдельного flow ожидания подтверждения/отказа.
+      Сейчас сразу строится WS/WebRTC. Если на сервере/host предполагается подтверждение, нужен явный протокол состояния (pending/approved/denied) и UX ожидания.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/SessionClient/Models.cs</span> (поле <code>RequireConfirm</code>),
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>ConnectAsViewerAsync</code>
+    </div>
+    <div><span class="k">Рекомендация:</span> реализовать подтверждение на уровне протокола (например, host отправляет approve по dc-control/WS), а viewer показывает “Ожидание подтверждения…” и не включает инжект ввода до approve.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Viewer: Ctrl+Alt+Del доступен всегда (нет явного согласия/политики)</span></div>
+    <div class="small muted">
+      В окне viewer есть кнопка Ctrl+Alt+Del, которая отправляет команду на host.
+      С учётом того, что host выполняет её без подтверждения (см. отдельный CRITICAL пункт), это усиливает риск “опасных действий одним кликом”.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/RemoteScreenWindow.xaml</span> — кнопка <code>Ctrl+Alt+Del</code>,
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Input.cs</span> — <code>SendCtrlAltDelAsync</code>
+    </div>
+    <div><span class="k">Рекомендация:</span> показывать кнопку только если host явно разрешил capability (и/или после approve), либо добавлять локальное подтверждение и аудит-лог.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">Signaling WS client: нет ограничения размера входящих сообщений → риск OOM/DoS</span></div>
+    <div class="small muted">
+      <code>WebSocketSignalingClient.ReceiveLoopAsync</code> копит фреймы в <code>MemoryStream</code> до <code>EndOfMessage</code>, затем делает <code>ms.ToArray()</code>.
+      При отсутствии лимита на длину сообщения злоумышленник/ошибка на сервере может прислать очень большой JSON и вызвать резкий рост памяти/краш клиента.
+      На сервере сейчас есть лимит 64KB, но клиент не должен на это полагаться.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/WebSocketSignalingClient.cs</span> — <code>ReceiveLoopAsync</code></div>
+    <div><span class="k">Рекомендация:</span> добавить max message size (например 256KB) и прерывать соединение/дропать сообщение при превышении, без аллокации полного буфера.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev high">HIGH</span> <span class="k">DataChannel protocol: отсутствуют лимиты/валидация размеров payload (dir_list, clipboard, file meta) → риск DoS</span></div>
+    <div class="small muted">
+      Для text сообщений data channel нет проверки длины <code>raw</code> до <code>JsonSerializer.Deserialize</code>.
+      Для некоторых payload (например, <code>DirListResponsePayload.Items</code>) теоретически можно прислать огромный список и уронить UI/память.
+      Для clipboard лимит реализован, но на обработке входящего всё равно используется fire-and-forget.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/WebRtcTransport/DataChannelCoordinator.cs</span> — <code>OnMessageReceived</code>,
+      <span class="file">client/WebRtcTransport/MixedRealityDataChannelAgent.cs</span> — получение bytes→string
+    </div>
+    <div><span class="k">Рекомендация:</span> ввести лимиты: max длина текста per kind/type (например control 64KB, input 4KB, clipboard 300KB, dir_list items limit), и отбрасывать превышающие сообщения.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Clipboard receive: fire-and-forget Task.Run + возможная очередь задач</span></div>
+    <div class="small muted">
+      При получении clipboard создаётся <code>Task.Run</code>, который постит <code>Clipboard.SetText</code> на UI поток.
+      При флуде сообщений можно получить очередь задач/постов и ухудшение отзывчивости.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/UiApp/ViewModels/MainViewModel.Clipboard.cs</span> — <code>OnClipboardReceived</code></div>
+    <div><span class="k">Рекомендация:</span> коалесить “последний текст” и применять не чаще N раз/сек; отбрасывать повтор/старые; не использовать Task.Run для простого async flow.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev med">MED</span> <span class="k">Require-confirm: поле API есть, но протокола подтверждения нет</span></div>
+    <div class="small muted">
+      <code>JoinSessionResponse.RequireConfirm</code> парсится, но нигде не используется для построения состояния “ожидание подтверждения/отказ”.
+      Это создаёт разрыв между UX настройкой “RequireConfirmation” и реальным поведением viewer/host.
+    </div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">client/SessionClient/Models.cs</span>, <span class="file">client/SessionClient/SessionApiClient.cs</span>,
+      <span class="file">client/UiApp/ViewModels/MainViewModel.Connection.cs</span> — <code>ConnectAsViewerAsync</code>
+    </div>
+    <div><span class="k">Рекомендация:</span> добавить явный approve/deny протокол (WS или dc-control) и блокировать управление до approve.</div>
+  </div>
+
+  <div class="card">
+    <div><span class="sev low">LOW</span> <span class="k">Семантика WSURL в API ответе относительная</span></div>
+    <div class="small muted">Сейчас сервер возвращает <code>WSURL: "/ws"</code>. Это удобно для локального dev, но клиенту нужен корректный абсолютный URL (wss/ws) с хостом/портом, особенно если API сидит за прокси.</div>
+    <div style="margin-top:8px;"><span class="k">Где:</span> <span class="file">server/internal/api/handler.go</span></div>
+    <div><span class="k">Рекомендация:</span> либо возвращать абсолютный URL (с учётом <code>X-Forwarded-Proto</code>/<code>Host</code> при доверенном прокси), либо явно документировать, что клиент строит WSURL сам из ServerBaseUrl.</div>
+  </div>
+
+  <h2>Предложения по оптимизации (качество / надёжность / производительность)</h2>
+  <div class="card">
+    <h3>Сервер (Go)</h3>
+    <ul>
+      <li><span class="k">Согласованность индексов сессий:</span> выделить единый приватный метод удаления сессии, который чистит <span class="file">sessionsByID</span>, <span class="file">sessionByLogin</span>, <span class="file">sessionByMachine</span> (и вызывать его из <code>Close</code> и <code>PruneExpired</code>).</li>
+      <li><span class="k">Rate limiting:</span> отделить лимиты для <span class="file">/ws</span> от API (handshake и долгие коннекты); плюс нормализация IP/заголовков за прокси.</li>
+      <li><span class="k">WebSocket:</span> добавить контекст отмены на чтение/пинг, обработку <code>CloseMessage</code>, метрики по причинам дисконнекта; логировать ошибки <code>WriteMessage</code> (хотя бы на debug).</li>
+      <li><span class="k">Токены:</span> если планируется горизонтальное масштабирование/рестарты — хранить секрет HMAC стабильно (env/secret manager), иначе токены отвалятся при рестарте; либо явно задокументировать, что токены короткоживущие и рестарт сбрасывает их (это нормально для MVP).</li>
+    </ul>
+    <h3>Клиент (WPF)</h3>
+    <ul>
+      <li><span class="k">HttpClient:</span> избегать частого <code>new HttpClient()</code> в тестах соединения (можно держать один экземпляр на всё приложение или использовать <code>IHttpClientFactory</code> если появится DI). Сейчас это не критично, но лучше закрепить практику.</li>
+      <li><span class="k">async void:</span> по возможности заменить на <code>Task</code>, где это не UI-событие, чтобы исключения не терялись и были тестируемыми.</li>
+      <li><span class="k">Логи:</span> сократить <code>catch { /* ignore */ }</code> в “важных” местах и хотя бы писать в debug-log причину (особенно для shutdown и file transfer).</li>
+      <li><span class="k">RID warning (NETSDK1206):</span> проверить рекомендации по RID usage (особенно для self-contained/publish), чтобы не словить “нет native dll” на другой версии Windows/в будущем SDK.</li>
+    </ul>
+  </div>
+
+  <h2>Что не хватает, чтобы конкурировать с AnyDesk (продуктовый разрыв)</h2>
+  <div class="card">
+    <h3>Безопасность уровня продукта</h3>
+    <ul>
+      <li><span class="k">Модель доверия/разрешений:</span> отдельные права на просмотр/управление/файлы/буфер/Ctrl+Alt+Del/UAC, выдача/отзыв, видимый индикатор “кто управляет”.</li>
+      <li><span class="k">Approve/deny flow:</span> режим “с подтверждением” как явный протокол (pending→approved/denied) и блокировка опасных действий до approve.</li>
+      <li><span class="k">Unattended в безопасном виде:</span> allowlist устройств/контактов, политика паролей/TTL, ограничение команд, аудит.</li>
+      <li><span class="k">Секреты и ключи:</span> хранение чувствительных данных через DPAPI, ротация токенов, минимизация сохранения кодов/паролей.</li>
+      <li><span class="k">Файлы:</span> sandbox путей, защита от path traversal/arbitrary write, подтверждения для delete/выдачи файлов.</li>
+    </ul>
+
+    <h3>Надёжность соединения и сеть</h3>
+    <ul>
+      <li><span class="k">TURN/STUN промышленного уровня:</span> стабильный fallback, близкие регионы, корректные сценарии при VPN/sleep/switch networks.</li>
+      <li><span class="k">Сервер сессий для продакшена:</span> Redis/БД, горизонтальное масштабирование, HA, anti-abuse, токены без утечек в URL.</li>
+      <li><span class="k">Reconnection без деградации:</span> отсутствие накопления задач/подписок, предсказуемые таймауты и восстановление state.</li>
+    </ul>
+
+    <h3>Качество картинки и производительность</h3>
+    <ul>
+      <li><span class="k">Аппаратное кодирование:</span> H.264/H.265/AV1 (по возможностям), адаптивный bitrate по stats (loss/jitter/rtt).</li>
+      <li><span class="k">Эффективный video pipeline:</span> GPU scaling, минимум копий, backpressure “только последний кадр”.</li>
+      <li><span class="k">Режимы:</span> seamless multi-monitor, выбор окна/процесса, высокая DPI-качество, управление FPS/CPU.</li>
+    </ul>
+
+    <h3>Удалённое управление</h3>
+    <ul>
+      <li><span class="k">Надёжный ввод:</span> reset input state, предотвращение “залипания”, раскладки/IME, хоткеи, блокировка локального ввода, “privacy screen”.</li>
+      <li><span class="k">UAC/secure desktop:</span> корректный архитектурный подход (часто service-mode), а не изменение политик реестра из сетевых событий.</li>
+    </ul>
+
+    <h3>Продуктовые вещи (чтобы покупали)</h3>
+    <ul>
+      <li><span class="k">Диагностика/телеметрия:</span> connection report, экспорт логов, метрики ICE/WS/WebRTC, понятные коды ошибок.</li>
+      <li><span class="k">Обновления и подпись:</span> авто-апдейтер, подпись, каналы релизов.</li>
+      <li><span class="k">Enterprise:</span> роли/ACL, аудит, централизованная адресная книга, MSI/GPO/MDM деплой, режим сервиса.</li>
+      <li><span class="k">Тестирование/CI:</span> долгие прогоны, нагрузка, фуззинг протокола, статанализ и security review.</li>
+    </ul>
+  </div>
+
+  <h2>Быстрый план исправлений (по приоритету)</h2>
+  <div class="card">
+    <ol>
+      <li><span class="k">Клиент (безопасность FT):</span> закрыть path traversal/arbitrary write при приёме файла (валидировать <code>TargetDirectory</code>/<code>RelativePath</code>, ограничить корень сохранения).</li>
+      <li><span class="k">Клиент (безопасность remote FS):</span> ограничить/подтверждать операции <code>dir_list/file_request/delete/create_folder</code> (sandbox + нормализация пути + UX подтверждения).</li>
+      <li><span class="k">Клиент (host безопасность):</span> добавить явное разрешение/подтверждение на опасные команды (ввод, Ctrl+Alt+Del/SAS), и не менять политики реестра из сетевых событий.</li>
+      <li><span class="k">Клиент (секреты):</span> не хранить коды/пароли в открытом виде в <code>%AppData%</code> (DPAPI/минимизация данных).</li>
+      <li><span class="k">Клиент (ICE):</span> поправить/прояснить логику upgrade monitor (роль, sessionId), и определять текущий маршрут по реально выбранной candidate pair (stats), а не по эвристике “observed candidates”.</li>
+      <li><span class="k">Клиент (viewer ввод):</span> убрать <code>Task.Run</code> на каждое событие ввода, добавить backpressure/coalescing для мыши и “reset input state” протокол от залипших клавиш.</li>
+      <li><span class="k">Клиент (confirm):</span> реализовать require-confirm/approve flow, чтобы viewer не мог инжектить ввод/опасные команды до подтверждения хостом.</li>
+      <li><span class="k">Клиент (видео):</span> убрать <code>Sleep</code> под <code>lock</code> в capture loop и добавить backpressure на viewer‑рендер (“только последний кадр”).</li>
+      <li><span class="k">Клиент (видео/CPU):</span> оптимизировать scaling путь (уйти от GDI <code>Bitmap</code> на каждый кадр) и снизить число копирований кадров.</li>
+      <li><span class="k">Сервер:</span> исправить <code>Close()</code>/<code>Join()</code> для закрытых сессий и синхронизировать очистку индексов (включая <code>PruneExpired()</code> + machine_id).</li>
+      <li><span class="k">Сервер:</span> нормализовать IP для rate limit и доверие к <code>X-Forwarded-For</code>.</li>
+      <li><span class="k">Сервер:</span> отказаться от токена в query (или минимизировать утечки/логирование), продумать стабильный secret для HMAC.</li>
+      <li><span class="k">Клиент:</span> минимизировать <code>async void</code> и “тихие” catch там, где это влияет на UX/надёжность (signaling/file transfer/shutdown).</li>
+      <li><span class="k">Инфра:</span> поставить Go SDK (если планируются server tests в CI) и добавить минимальный CI шаг: <code>go test</code>, <code>go vet</code>, <code>dotnet test</code>.</li>
+    </ol>
+  </div>
+
+  <div class="meta" style="margin-top:18px;">
+    Этот отчёт сформирован по состоянию файлов в рабочем дереве. Если нужно — могу сразу внести правки в код и/или добавить CI-пайплайн.
+  </div>
+</body>
+</html>
+

@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"zconect/server/internal/api"
+	"zconect/server/internal/auth"
 	"zconect/server/internal/config"
 	"zconect/server/internal/logging"
+	"zconect/server/internal/ratelimit"
 	"zconect/server/internal/session"
 	"zconect/server/internal/signaling"
 )
@@ -26,17 +28,21 @@ func main() {
 	defer logger.Close()
 
 	svc := session.NewService(cfg.SessionTTL, cfg.MaxJoinAttempts, cfg.LockDuration)
-	handler := api.NewHandler(svc, logger)
+	tokenSvc := auth.NewTokenService(60 * time.Second)
+	handler := api.NewHandler(svc, logger, tokenSvc)
 	hub := signaling.NewHub()
-	wsHandler := signaling.NewHandler(hub, svc, logger)
+	wsHandler := signaling.NewHandler(hub, svc, logger, tokenSvc, cfg.AllowedOrigins)
 
 	mux := http.NewServeMux()
 	handler.Register(mux)
 	mux.Handle("/ws", wsHandler)
 
+	// Per-IP rate limiting: 60 requests per minute for API endpoints.
+	limiter := ratelimit.New(60, time.Minute)
+
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           mux,
+		Handler:           limiter.Middleware(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

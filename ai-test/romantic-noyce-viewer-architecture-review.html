@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Viewer Architecture Review — romantic-noyce</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px}.muted{color:#9fb0c8} table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top} th{background:#10182a}
+  </style>
+</head>
+<body>
+  <h1>Viewer Architecture Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Отдельный отчёт по viewer-сценарию: join, caller start, reconnect, ICE upgrade, input/video/file flows со стороны зрителя.</p>
+
+  <div class="card good">
+    <h2>Короткий вывод</h2>
+    <p>Viewer-сторона у тебя уже сделана довольно умно: есть единая точка входа в подключение, fast-connect подход для ICE, health-check по ping/pong, full reconnect path, синхронизация дисплеев/настроек видео, нормальная обработка input surface.</p>
+    <p>Но viewer-режим остаётся <strong>самым сложным transport-runtime сценарием</strong> во всём приложении. Именно здесь живут основные риски гонок, ложных состояний и не до конца надёжной reconnect-логики.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что анализировалось</h2>
+    <ul>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Connection.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Input.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Video.cs</code></li>
+      <li><code>client/SessionClient/SessionApiClient.cs</code></li>
+      <li><code>server/internal/api/handler.go</code></li>
+    </ul>
+  </div>
+
+  <div class="card good">
+    <h2>Что уже хорошо</h2>
+    <ul>
+      <li><strong>Есть единая точка входа</strong> <code>ConnectAsViewerAsync()</code> — это хорошая основа.</li>
+      <li><strong>Fast connect + upgrade later</strong> — правильное направление для ICE.</li>
+      <li><strong>WaitForDataChannelOpenAsync()</strong> ждёт реальное connectivity proof, а не просто факт обмена candidate'ами.</li>
+      <li><strong>Viewer reconnect делает full runtime rebuild</strong>, что безопаснее, чем пытаться латать всё in-place.</li>
+      <li><strong>Есть ping/pong health check</strong> и попытка восстановления при silence.</li>
+      <li><strong>Input mapping по remote surface</strong> выглядит аккуратно и с учётом letterbox/scale.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>1. Join API + viewer trust model слишком опираются на одноразовые коды и session_id</h2>
+    <p><strong>Файлы:</strong> <code>SessionApiClient.cs</code>, <code>handler.go</code></p>
+    <p>С точки зрения viewer сценарий начинается нормально: join идёт по login/pass. Но дальше viewer получает:</p>
+    <ul>
+      <li><code>session_id</code></li>
+      <li><code>ws_token</code></li>
+    </ul>
+    <p>А затем reconnect-path viewer'а фактически опирается на <code>refresh(session_id)</code>, который на сервере недостаточно защищён.</p>
+    <p><strong>Вывод:</strong> viewer reconnect security сейчас наследует ту же проблему, что и host-side refresh API.</p>
+  </div>
+
+  <div class="card med">
+    <h2>2. Viewer считает подключение успешным чуть раньше, чем это хотелось бы</h2>
+    <p><strong>Файл:</strong> <code>ConnectAsViewerAsync()</code></p>
+    <p>После <code>ConnectWsWithAutoIcePriorityAsync(...)</code> код продолжает:</p>
+    <ul>
+      <li>открывать окно remote screen;</li>
+      <li>ставить <code>SetStatus($"Подключено: ...")</code>.</li>
+    </ul>
+    <p>Но внутри fast-connect path возможен сценарий, где data channel так и не открылся вовремя, и код только запускает retry loop со статусом <code>ICE: ожидание соединения...</code>.</p>
+    <p><strong>Риск:</strong> UI верхнего уровня может показать слишком оптимистичное состояние подключения.</p>
+    <p><strong>Лучше:</strong> возвращать из connect path более точный результат:</p>
+    <ul>
+      <li>Connected</li>
+      <li>ConnectingButNotConfirmed</li>
+      <li>Failed</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>3. Caller start всё ещё опирается на хрупкую signaling workaround-логику</h2>
+    <p><strong>Файл:</strong> <code>ConnectWsAsync()</code></p>
+    <p>Viewer — это caller. Но because server is a dumb relay, viewer не может просто сразу послать offer. Поэтому у тебя есть:</p>
+    <ul>
+      <li><code>_callerStartDeferred</code></li>
+      <li>ожидание <code>peer_state</code></li>
+      <li>таймерный fallback через 1500 ms</li>
+    </ul>
+    <p><strong>Это рабочий workaround, но архитектурно слабое место.</strong> Именно viewer path сильнее всего зависит от того, успеет ли signaling timing совпасть правильно.</p>
+  </div>
+
+  <div class="card high">
+    <h2>4. Viewer reconnect path очень сложный и может легко создавать ложные success-состояния</h2>
+    <p><strong>Файл:</strong> <code>WsReconnectLoopAsync()</code></p>
+    <p>Viewer reconnect делает full reconnect — это правильно. Но после него код:</p>
+    <ul>
+      <li>повторно поднимает WS</li>
+      <li>повторно создаёт WebRTC/runtime/data channels</li>
+      <li>открывает remote screen window</li>
+      <li>ставит статус <code>Переподключено</code></li>
+    </ul>
+    <p><strong>Проблема:</strong> reconnect success сейчас завязан скорее на успешный runtime restart, чем на подтверждённый рабочий media/data path.</p>
+    <p>То есть viewer reconnect может считаться успешным до того, как реально восстановился usable transport.</p>
+  </div>
+
+  <div class="card med">
+    <h2>5. Health-check по ping/pong правильный, но reconnect trigger довольно грубый</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Video.cs</code></p>
+    <p>Если нет pong 30 секунд — viewer запускает reconnect.</p>
+    <p><strong>Плюс:</strong> это practical safety net.</p>
+    <p><strong>Минус:</strong> логика опирается только на pong silence и не различает:</p>
+    <ul>
+      <li>мертвый datachannel</li>
+      <li>подвисший control path</li>
+      <li>живой media path при деградировавшем DC</li>
+      <li>временные лаги/заморозки UI</li>
+    </ul>
+    <p>В целом это acceptable для MVP, но viewer reconnect политика пока довольно грубая.</p>
+  </div>
+
+  <div class="card high">
+    <h2>6. Viewer-side ICE upgrade решения принимаются по неидеальной телеметрии</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Connection.cs</code></p>
+    <p>Viewer — единственная сторона, которая запускает ICE upgrade monitor и делает restart как caller. Значит, именно viewer больше всего зависит от качества route inference.</p>
+    <p>А route сейчас определяется по observed candidate types, а не по selected pair.</p>
+    <p><strong>Следствие:</strong> именно viewer runtime может ошибаться с upgrade/degrade решениями чаще всего.</p>
+  </div>
+
+  <div class="card med">
+    <h2>7. Viewer input path выглядит хорошо, но fire-and-forget sender'ы могут скрывать ошибки</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Input.cs</code></p>
+    <p>Mouse/keyboard отправляются через <code>SafeSendMouseAsync</code> / <code>SafeSendKeyboardAsync</code> как fire-and-forget задачи.</p>
+    <p><strong>Это норм для responsiveness</strong>, но есть и минус: ошибки и задержки в datachannel path могут долго оставаться скрытыми, особенно если соединение уже частично развалилось.</p>
+  </div>
+
+  <div class="card low">
+    <h2>8. Координатный mapping viewer → remote host сделан аккуратно</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Input.cs</code></p>
+    <p>Это сильное место. Учтены:</p>
+    <ul>
+      <li>letterbox offsets;</li>
+      <li>Uniform scaling;</li>
+      <li>capture rect offsets;</li>
+      <li>clamp в допустимые координаты.</li>
+    </ul>
+    <p>С точки зрения viewer UX это хороший фундамент.</p>
+  </div>
+
+  <div class="card med">
+    <h2>9. Viewer path смешивает UI-успех, transport-успех и session-успех</h2>
+    <p>Сейчас в нескольких местах статусы типа:</p>
+    <ul>
+      <li>«Подключено»</li>
+      <li>«Переподключено»</li>
+      <li>«WS: peer_state»</li>
+      <li>«ICE: ожидание соединения...»</li>
+    </ul>
+    <p>могут пересекаться и перетирать друг друга.</p>
+    <p><strong>Вывод:</strong> viewer runtime просит разделения как минимум на 3 слоя состояний:</p>
+    <ul>
+      <li>Session/WS status</li>
+      <li>Transport status</li>
+      <li>Media/UI status</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>10. Viewer-side file transfer bootstrap пересоздаётся на каждый reconnect</h2>
+    <p>Это логично, но нужно внимательно следить, чтобы UI FT-окно не держало старую ссылку на сервис/runtime после reconnect. Иначе появятся «живые», но уже оторванные от transport слоя объекты.</p>
+  </div>
+
+  <div class="card high">
+    <h2>11. MainViewModel уже слишком много знает о viewer runtime</h2>
+    <p>Для viewer path ViewModel сейчас держит:</p>
+    <ul>
+      <li>join/session orchestration;</li>
+      <li>WS lifecycle;</li>
+      <li>caller start logic;</li>
+      <li>ICE monitoring;</li>
+      <li>RTT/health checking;</li>
+      <li>remote video rendering hooks;</li>
+      <li>input sending;</li>
+      <li>file transfer bootstrap.</li>
+    </ul>
+    <p>Это уже не просто VM, а viewer runtime coordinator. И это главный источник будущей сложности.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что бы я чинил первым именно для viewer-стороны</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что менять</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Разделить states: WS / transport / media / UI</td><td>Убрать ложные success-состояния</td></tr>
+      <tr><td>2</td><td>Возвращать из connect/reconnect path явный результат подтверждённого подключения</td><td>Чтобы viewer не считал success слишком рано</td></tr>
+      <tr><td>3</td><td>Сделать signaling readiness честнее и убрать часть defer/timer логики</td><td>Это главный хрупкий участок caller path</td></tr>
+      <tr><td>4</td><td>Перевести ICE route detection на selected pair stats</td><td>Viewer сильнее всех зависит от корректности upgrade monitor</td></tr>
+      <tr><td>5</td><td>Вынести viewer runtime coordinator из MainViewModel</td><td>Снизить сложность и риски гонок</td></tr>
+    </table>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>Viewer-сторона у тебя уже <strong>технически сильная</strong>, но она же и самая сложная. Основная проблема не в том, что логика неправильная, а в том, что <strong>слишком много разных типов состояний и переходов живут в одном месте и не до конца формализованы</strong>. Именно viewer path я бы считал главным кандидатом на будущую state-machine/coordination реорганизацию.</p>
+  </div>
+</body>
+</html>

@@ -10,6 +10,9 @@ func (s *Service) PruneExpired(now time.Time) int {
 	for id, sess := range s.sessionsByID {
 		if now.After(sess.ExpiresAt) || sess.State == StateClosed {
 			delete(s.sessionByLogin, sess.LoginCode)
+			if sess.MachineID != "" {
+				delete(s.sessionByMachine, sess.MachineID)
+			}
 			delete(s.sessionsByID, id)
 			removed++
 		}

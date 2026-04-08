@@ -1,9 +1,15 @@
+using System.Media;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media.Animation;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FileTransfer;
 using SessionClient;
 using UiApp.Services;
 using UiApp.ViewModels;
@@ -12,31 +18,114 @@ namespace UiApp;
 
 public partial class MainWindow : Window
 {
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FLASHWINFO
+    {
+        public uint cbSize;
+        public IntPtr hwnd;
+        public uint dwFlags;
+        public uint uCount;
+        public uint dwTimeout;
+    }
+
+    private const uint FLASHW_ALL = 3;
+    private const uint FLASHW_TIMERNOFG = 12;
+
     private MainViewModel? Vm => DataContext as MainViewModel;
     private RemoteScreenWindow? _remoteWindow;
     private SystemSettingsWindow? _systemSettingsWindow;
     private bool _closing;
+    private bool _forceClose; // true = exit app, false = minimize to tray
+    private System.Windows.Forms.NotifyIcon? _notifyIcon;
 
     public MainWindow()
     {
         InitializeComponent();
         var sessionApiClient = new SessionApiClient(new HttpClient());
-        DataContext = new MainViewModel(new SettingsService(), new LogService(), sessionApiClient);
+        DataContext = new MainViewModel(new SettingsService(), new LogService(), sessionApiClient, new AddressBookService());
 
         if (DataContext is MainViewModel vm)
         {
             vm.RemoteScreenWindowRequested += OpenOrActivateRemoteScreenWindow;
+            vm.FileTransferWindowRequested += OpenFileTransferWindow;
+            vm.ViewerConnectedNotification += OnViewerConnected;
         }
 
+        InitNotifyIcon();
+
         Closing += OnClosingAsync;
+        Loaded += async (_, _) =>
+        {
+            if (DataContext is MainViewModel vm2)
+                await vm2.InitializeOnLoadAsync();
+        };
+    }
+
+    private void InitNotifyIcon()
+    {
+        var iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/app.ico"))?.Stream;
+        var icon = iconStream is not null ? new System.Drawing.Icon(iconStream) : System.Drawing.SystemIcons.Application;
+
+        _notifyIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Icon = icon,
+            Text = "ZConect",
+            Visible = false
+        };
+
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Открыть", null, (_, _) => RestoreFromTray());
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        menu.Items.Add("Выход", null, (_, _) => ForceClose());
+
+        _notifyIcon.ContextMenuStrip = menu;
+        _notifyIcon.DoubleClick += (_, _) => RestoreFromTray();
+    }
+
+    private void RestoreFromTray()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _notifyIcon!.Visible = false;
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+        });
+    }
+
+    private void ForceClose()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _forceClose = true;
+            _notifyIcon?.Dispose();
+            _notifyIcon = null;
+            Close();
+        });
     }
 
     private async void OnClosingAsync(object? sender, CancelEventArgs e)
     {
         if (_closing)
         {
-            // Shutdown is already in progress; ignore repeated clicks.
             e.Cancel = true;
+            return;
+        }
+
+        // Minimize to tray instead of closing (unless force close from tray menu, Меню→Выход, or setting disabled).
+        if (!_forceClose && Vm?.MinimizeToTray == true)
+        {
+            e.Cancel = true;
+            Hide();
+            if (_notifyIcon is not null)
+            {
+                _notifyIcon.Visible = true;
+                _notifyIcon.ShowBalloonTip(2000, "ZConect", "Приложение свёрнуто в трей", System.Windows.Forms.ToolTipIcon.Info);
+            }
             return;
         }
 
@@ -46,7 +135,6 @@ public partial class MainWindow : Window
 
         try
         {
-            // Close/hide remote window first to stop UI event pumping.
             if (_remoteWindow is not null)
             {
                 try
@@ -54,10 +142,7 @@ public partial class MainWindow : Window
                     _remoteWindow.AllowRealClose();
                     _remoteWindow.Close();
                 }
-                catch
-                {
-                    // ignore
-                }
+                catch { /* ignore */ }
             }
             if (_systemSettingsWindow is not null)
             {
@@ -66,32 +151,23 @@ public partial class MainWindow : Window
 
             if (Vm is not null)
             {
-                // Never hang forever on close: wait bounded time for graceful shutdown.
                 var shutdownTask = Vm.ShutdownAsync();
                 var completed = await Task.WhenAny(shutdownTask, Task.Delay(3000)) == shutdownTask;
                 if (!completed)
                 {
-                    // Last-resort sync cleanup attempt.
                     try { Vm.Shutdown(); } catch { /* ignore */ }
                 }
             }
         }
-        catch
-        {
-            // ignore
-        }
+        catch { /* ignore */ }
 
         try
         {
-            // Now allow the window to actually close.
             Closing -= OnClosingAsync;
             Application.Current.Shutdown();
         }
-        catch
-        {
-            // Last-resort: do not leave zombie process in memory.
-            Environment.Exit(0);
-        }
+        catch { /* ignore */ }
+        Environment.Exit(0);
     }
 
     private void OpenOrActivateRemoteScreenWindow()
@@ -102,7 +178,6 @@ public partial class MainWindow : Window
             {
                 _remoteWindow = new RemoteScreenWindow
                 {
-                    Owner = this,
                     DataContext = DataContext
                 };
                 _remoteWindow.Show();
@@ -118,6 +193,108 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OpenFileTransferWindow(FileTransferService fileTransferService, UiApp.Models.IncomingSaveDirHolder incomingSaveDirHolder, UiApp.Models.OutgoingTargetDirHolder outgoingTargetDirHolder, MainViewModel mainViewModel)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var w = new FileTransferWindow(fileTransferService, incomingSaveDirHolder, outgoingTargetDirHolder, mainViewModel) { Owner = this };
+            w.Show();
+        });
+    }
+
+    private void OnViewerConnected()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            // Play system notification sound.
+            SystemSounds.Asterisk.Play();
+
+            // Show Windows native notification via tray icon.
+            if (_notifyIcon is not null)
+            {
+                _notifyIcon.Visible = true;
+                _notifyIcon.ShowBalloonTip(3000, "ZConnect", "Зритель подключился к вашей сессии", System.Windows.Forms.ToolTipIcon.Info);
+                // Hide tray icon after balloon if window is visible (not minimized to tray).
+                if (IsVisible)
+                {
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                    timer.Tick += (_, _) => { timer.Stop(); if (IsVisible && _notifyIcon is not null) _notifyIcon.Visible = false; };
+                    timer.Start();
+                }
+            }
+
+            // Flash taskbar if window is not focused.
+            if (!IsActive)
+            {
+                var helper = new WindowInteropHelper(this);
+                var info = new FLASHWINFO
+                {
+                    cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(),
+                    hwnd = helper.Handle,
+                    dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG,
+                    uCount = 5,
+                    dwTimeout = 0
+                };
+                FlashWindowEx(ref info);
+            }
+        });
+    }
+
+    private void SessionCode_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (Vm is null) return;
+        var login = Vm.LoginCode?.Trim() ?? string.Empty;
+        var pass = Vm.PassCode?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(pass)) return;
+
+        try
+        {
+            Clipboard.SetText($"Логин: {login}{Environment.NewLine}Пароль: {pass}");
+            ShowToast("Логин и пароль скопированы");
+        }
+        catch { /* ignore */ }
+    }
+
+    private void ShowToast(string message)
+    {
+        ToastText.Text = message;
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
+        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300))
+        {
+            BeginTime = TimeSpan.FromSeconds(2)
+        };
+        ToastOverlay.BeginAnimation(OpacityProperty, null);
+        ToastOverlay.Opacity = 0;
+        var sb = new Storyboard();
+        sb.Children.Add(fadeIn);
+        sb.Children.Add(fadeOut);
+        Storyboard.SetTarget(fadeIn, ToastOverlay);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(OpacityProperty));
+        Storyboard.SetTarget(fadeOut, ToastOverlay);
+        Storyboard.SetTargetProperty(fadeOut, new PropertyPath(OpacityProperty));
+        sb.Begin();
+    }
+
+    private void ShowViewerToast()
+    {
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(400))
+        {
+            BeginTime = TimeSpan.FromSeconds(3)
+        };
+        ViewerToast.BeginAnimation(OpacityProperty, null);
+        ViewerToast.Opacity = 0;
+        var sb = new Storyboard();
+        sb.Children.Add(fadeIn);
+        sb.Children.Add(fadeOut);
+        Storyboard.SetTarget(fadeIn, ViewerToast);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(OpacityProperty));
+        Storyboard.SetTarget(fadeOut, ViewerToast);
+        Storyboard.SetTargetProperty(fadeOut, new PropertyPath(OpacityProperty));
+        sb.Begin();
+    }
+
     private void MenuSystem_Click(object sender, RoutedEventArgs e)
     {
         Dispatcher.Invoke(() =>
@@ -126,7 +303,6 @@ public partial class MainWindow : Window
             {
                 _systemSettingsWindow = new SystemSettingsWindow
                 {
-                    Owner = this,
                     DataContext = DataContext
                 };
                 _systemSettingsWindow.Show();
@@ -144,17 +320,7 @@ public partial class MainWindow : Window
 
     private void MenuExit_Click(object sender, RoutedEventArgs e)
     {
-        Application.Current.Shutdown();
-    }
-
-    private void MenuToolsStub1_Click(object sender, RoutedEventArgs e)
-    {
-        MessageBox.Show(this, "Раздел инструментов будет добавлен в следующих версиях.", "Инструменты", MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-
-    private void MenuToolsStub2_Click(object sender, RoutedEventArgs e)
-    {
-        MessageBox.Show(this, "Раздел инструментов будет добавлен в следующих версиях.", "Инструменты", MessageBoxButton.OK, MessageBoxImage.Information);
+        ForceClose();
     }
 
     private void MenuHelp_Click(object sender, RoutedEventArgs e)

@@ -1,5 +1,8 @@
 services:
   signaling:
+    # Образ собирается на Windows и загружается через deploy_from_windows.ps1.
+    # Для ручной сборки прямо на сервере: docker compose up -d --build
+    image: zconect-signaling:latest
     build:
       context: ../server
       dockerfile: Dockerfile
@@ -11,11 +14,6 @@ services:
       LOCK_MINUTES: "${LOCK_MINUTES:-10}"
     ports:
       - "${SIGNALING_PORT:-8080}:8080"
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: zconect-redis
     restart: unless-stopped
 
   coturn:

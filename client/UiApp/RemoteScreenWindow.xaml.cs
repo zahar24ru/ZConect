@@ -28,13 +28,14 @@ public partial class RemoteScreenWindow : Window
             return;
         }
 
-        // UX: closing the window should not disconnect the session.
-        // Hide instead; user can reopen via "Подключиться" (Viewer) which re-activates this window.
+        // Закрытие окна удалённого экрана = завершение подключения viewer.
         e.Cancel = true;
         try
         {
             Hide();
             Vm?.HandleRemoteSurfaceLostFocus();
+            // Инициируем отключение viewer-сессии.
+            Vm?.DisconnectViewerAsync();
         }
         catch
         {

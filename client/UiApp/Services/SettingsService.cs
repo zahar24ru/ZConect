@@ -25,20 +25,32 @@ public sealed class SettingsService
 
     public ClientSettings Load()
     {
+        ClientSettings settings;
         if (!File.Exists(SettingsPath))
         {
-            return new ClientSettings();
+            settings = new ClientSettings();
+        }
+        else
+        {
+            try
+            {
+                var raw = File.ReadAllText(SettingsPath);
+                settings = JsonSerializer.Deserialize<ClientSettings>(raw, JsonOptions) ?? new ClientSettings();
+            }
+            catch
+            {
+                settings = new ClientSettings();
+            }
         }
 
-        try
+        // Generate persistent machine ID on first run.
+        if (string.IsNullOrWhiteSpace(settings.MachineId))
         {
-            var raw = File.ReadAllText(SettingsPath);
-            return JsonSerializer.Deserialize<ClientSettings>(raw, JsonOptions) ?? new ClientSettings();
+            settings.MachineId = Guid.NewGuid().ToString("N");
+            Save(settings);
         }
-        catch
-        {
-            return new ClientSettings();
-        }
+
+        return settings;
     }
 
     public void Save(ClientSettings settings)

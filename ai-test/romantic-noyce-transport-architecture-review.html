@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transport Architecture Review — romantic-noyce</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1120px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px}.muted{color:#9fb0c8} table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top} th{background:#10182a}
+  </style>
+</head>
+<body>
+  <h1>Transport Architecture Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Специализированный отчёт по signaling, ICE, WebRTC transport и потоку удалённого рабочего стола.</p>
+
+  <div class="card good">
+    <h2>Короткий вердикт</h2>
+    <p>Транспортная архитектура проекта <strong>уже достаточно зрелая для MVP</strong>. В ней есть правильные инженерные решения: data channel как реальный connectivity proof, fallback DXGI → GDI, peer reset после disconnect, adaptive capture, relay как last resort.</p>
+    <p>Но самые опасные техдолги сейчас лежат не в захвате экрана, а в <strong>signaling lifecycle</strong> и в том, <strong>как клиент делает выводы о качестве ICE-маршрута</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что именно анализировалось</h2>
+    <ul>
+      <li><code>client/WebRtcTransport/SignalingCoordinator.cs</code></li>
+      <li><code>client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Connection.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Video.cs</code></li>
+      <li><code>server/internal/signaling/handler.go</code></li>
+      <li><code>server/internal/signaling/hub.go</code></li>
+    </ul>
+  </div>
+
+  <div class="card good">
+    <h2>Что в архитектуре уже хорошо</h2>
+    <ul>
+      <li><strong>Signaling relay отделён от session API.</strong> Это правильно и упрощает reasoning.</li>
+      <li><strong>Data channel open используется как реальное доказательство connectivity.</strong> Это сильное решение.</li>
+      <li><strong>Host и viewer имеют разный reconnect path.</strong> Это сложнее, но по смыслу верно.</li>
+      <li><strong>Видео-пайплайн уже не наивный:</strong> DXGI, GDI fallback, scaling, buffer reuse, adaptive capture.</li>
+      <li><strong>Есть идея ICE upgrade monitor.</strong> То есть проект уже пытается быть не просто «соединились как получится», а оптимизировать путь.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>1. Signaling lifecycle: основная слабая точка</h2>
+    <p>Серверный WebSocket слой работает как тупой relay: он не понимает offer/answer/ice как сущности и не буферизует критичные сообщения. Это допустимо для MVP, но приводит к тому, что клиенту приходится компенсировать потерю timing-семантики.</p>
+    <p><strong>Симптомы уже видны в коде клиента:</strong></p>
+    <ul>
+      <li>deferred caller start;</li>
+      <li>ожидание <code>peer_state</code>;</li>
+      <li>таймерный fallback старта offer.</li>
+    </ul>
+    <p><strong>Проблема:</strong> signaling-состояние по сути размазано между сервером и клиентом, но сервер почти ничего не знает, поэтому вся сложность оседает в клиенте.</p>
+  </div>
+
+  <div class="card high">
+    <h2>2. Route inference по observed ICE candidates — ненадёжная телеметрия</h2>
+    <p>Сейчас тип маршрута фактически выводится по строкам вида <code>typ host</code>, <code>typ srflx</code>, <code>typ relay</code>, которые были замечены в signaling-потоке.</p>
+    <p><strong>Но это не эквивалентно selected candidate pair.</strong></p>
+    <p>Из этого следуют реальные риски:</p>
+    <ul>
+      <li>UI может показывать не тот route, который реально используется;</li>
+      <li>ICE upgrade monitor может принимать неверные решения;</li>
+      <li>можно получить лишние ICE restart на уже хорошем канале.</li>
+    </ul>
+    <p><strong>Правильнее:</strong> вытаскивать selected/active candidate pair из реальных WebRTC stats, если библиотека даёт такую информацию.</p>
+  </div>
+
+  <div class="card med">
+    <h2>3. ICE-стратегия по идее сильная, но логика принятия решений местами грубая</h2>
+    <p>Подход <strong>All ICE methods first, upgrade later</strong> сам по себе хороший. Он лучше, чем вручную делать строгую последовательность LAN → STUN → TURN.</p>
+    <p>Однако monitor сейчас зависит от:</p>
+    <ul>
+      <li>network change events;</li>
+      <li>условного route type;</li>
+      <li>RTT;</li>
+      <li>серии retry/restart.</li>
+    </ul>
+    <p><strong>Что тут не идеально:</strong></p>
+    <ul>
+      <li>network change events бывают шумными;</li>
+      <li>RTT сам по себе не всегда означает лучший путь;</li>
+      <li>route type сейчас inferred, а не selected;</li>
+      <li>restart policy стоит сильнее ограничить budget/cooldown-логикой.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>4. ICE restart через ручную правку SDP — рабочий, но хрупкий hack</h2>
+    <p><code>ForceIceRestart()</code> заменяет <code>ice-ufrag</code> и <code>ice-pwd</code> через regex. Это часто срабатывает, но остаётся workaround-ом.</p>
+    <p><strong>Риск:</strong> поведение зависит от того, насколько библиотека MixedReality WebRTC терпимо относится к таким restart'ам без более высокого уровня API.</p>
+    <p><strong>Рекомендация:</strong> если в библиотеке есть штатный механизм ICE restart, переходить на него. Если нет — хотя бы явно документировать это место как controlled workaround.</p>
+  </div>
+
+  <div class="card med">
+    <h2>5. Reconnect/reset lifecycle уже очень сложный</h2>
+    <p>Сейчас в клиенте есть несколько пересекающихся веток runtime-логики:</p>
+    <ul>
+      <li><code>ConnectWsAsync</code></li>
+      <li><code>ConnectWsWithAutoIcePriorityAsync</code></li>
+      <li><code>CleanupConnectionAsync</code></li>
+      <li><code>ResetForNewViewerAsync</code></li>
+      <li><code>WsReconnectLoopAsync</code></li>
+      <li><code>IceUpgradeMonitorLoopAsync</code></li>
+    </ul>
+    <p><strong>Это не ошибка прямо сейчас, но это уже зона высокой хрупкости.</strong> В будущем именно тут будут жить самые неприятные race/regression-баги.</p>
+  </div>
+
+  <div class="card good">
+    <h2>6. Поток удалённого рабочего стола спроектирован лучше, чем можно ожидать от MVP</h2>
+    <p>Пайплайн на host:</p>
+    <ul>
+      <li>выбор display / virtual desktop;</li>
+      <li>quality profile → target resolution/fps;</li>
+      <li>DXGI single output или DXGI multi / GDI fallback;</li>
+      <li>double-buffered pinned frame storage;</li>
+      <li>ExternalVideoTrackSource → local video track → transceiver.</li>
+    </ul>
+    <p>На viewer:</p>
+    <ul>
+      <li>remote argb frame;</li>
+      <li>копия в pooled managed buffer;</li>
+      <li>рендер в <code>WriteableBitmap</code>.</li>
+    </ul>
+    <p>Для MVP это уже очень неплохо.</p>
+  </div>
+
+  <div class="card med">
+    <h2>7. Но <code>MixedRealityPeerConnectionAgent</code> уже совмещает слишком много уровней ответственности</h2>
+    <p>Сейчас один класс управляет одновременно:</p>
+    <ul>
+      <li>PeerConnection;</li>
+      <li>ICE candidate callbacks;</li>
+      <li>SDP lifecycle;</li>
+      <li>local track attach;</li>
+      <li>capture thread;</li>
+      <li>DXGI path;</li>
+      <li>GDI path;</li>
+      <li>scaling;</li>
+      <li>viewer buffer pool;</li>
+      <li>remote frame delivery.</li>
+    </ul>
+    <p><strong>Вывод:</strong> это уже не просто peer wrapper. Его стоит дробить хотя бы на:</p>
+    <ul>
+      <li>peer connection wrapper;</li>
+      <li>capture pipeline;</li>
+      <li>remote frame adapter.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>8. Viewer-side video path делает лишние копии, и это может стать bottleneck</h2>
+    <p>Сначала кадр копируется из native frame в managed buffer, потом ещё в backbuffer <code>WriteableBitmap</code>.</p>
+    <p>Для текущего этапа ок. Но если потом захочется:</p>
+    <ul>
+      <li>более высокие FPS;</li>
+      <li>большие разрешения;</li>
+      <li>слабые клиентские машины;</li>
+    </ul>
+    <p>— viewer rendering path станет одним из первых кандидатов на оптимизацию.</p>
+  </div>
+
+  <div class="card low">
+    <h2>9. Multi-monitor / All displays — честно рабочий, но потенциально дорогой путь</h2>
+    <p>Для режима <code>All</code> архитектура ожидаемо тяжелее. Это не баг, а инженерное ограничение:</p>
+    <ul>
+      <li>большая область захвата;</li>
+      <li>возможный GDI fallback;</li>
+      <li>много пикселей на кадр;</li>
+      <li>дополнительное масштабирование.</li>
+    </ul>
+    <p>Важно лишь не обещать, что multi-monitor режим будет таким же лёгким, как single display.</p>
+  </div>
+
+  <div class="card">
+    <h2>Куда бы я смотрел первым при дальнейших улучшениях</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что улучшить</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Перевести route detection на selected candidate pair / stats</td><td>Это главный источник ложных решений в ICE upgrade</td></tr>
+      <tr><td>2</td><td>Сделать более формальный signaling readiness lifecycle</td><td>Убрать часть defer/timer магии у caller</td></tr>
+      <tr><td>3</td><td>Ограничить ICE restart policy budget/cooldown-ом</td><td>Снизить шум и ненужные restarts</td></tr>
+      <tr><td>4</td><td>Выделить отдельный runtime coordinator/state machine</td><td>Сделать reconnect/reset более предсказуемыми</td></tr>
+      <tr><td>5</td><td>Дробить MixedRealityPeerConnectionAgent</td><td>Снизить сложность сопровождения video pipeline</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Отдельно: file transfer поверх data channel</h2>
+    <p>Файловый обмен использует ту же transport-базу и тоже относится к transport/runtime уровню, поэтому его стоит оценивать здесь же.</p>
+  </div>
+
+  <div class="card med">
+    <h3>10. Протокол file transfer в целом удачный</h3>
+    <ul>
+      <li>binary chunks вместо Base64 — правильно;</li>
+      <li>есть отдельные meta / chunk / end / ack / error события;</li>
+      <li>есть relative path для папок;</li>
+      <li>есть hash-check и temp file на приёмнике.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h3>11. ACK-модель сейчас логически смазана</h3>
+    <p>Отправитель считает передачу завершённой сразу после <code>file_end</code>, хотя приёмник ещё только начинает финальную проверку hash и перемещение файла. Это создаёт race между UI success-state и реальным подтверждением успешного приёма.</p>
+  </div>
+
+  <div class="card med">
+    <h3>12. Binary chunks требуют жёсткого лимита размера</h3>
+    <p>Сейчас large chunk может привести к лишнему расходу памяти и дорогой распаковке. Для transport-уровня это важный hardening-пункт.</p>
+  </div>
+
+  <div class="card med">
+    <h3>13. Control-channel файловой панели может стать тяжёлым из-за recursive dir size</h3>
+    <p>Подсчёт полного размера директорий прямо в listing-ответе — дорогая операция и не очень подходит для интерактивного транспортного протокола.</p>
+  </div>
+
+  <div class="card med">
+    <h3>14. Remote delete/create/file request требуют более чёткой trust-модели</h3>
+    <p>Сейчас это очень широкие операции над файловой системой. Для режима доверенной удалённой помощи это может быть приемлемо, но transport/security слой должен это явно осознавать и ограничивать при необходимости.</p>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>Если честно: транспортная часть проекта <strong>уже сильнее, чем у многих MVP</strong>. Самые важные слабые места сейчас — это не “не умеет работать”, а <strong>сложность runtime-поведения</strong>, <strong>недостаточно точная телеметрия ICE</strong> и <strong>несколько важных краевых сценариев в file transfer</strong>. Это хорошие проблемы: значит, база уже есть, и дальше речь идёт о доводке инженерного качества, а не о спасении архитектуры с нуля.</p>
+  </div>
+</body>
+</html>

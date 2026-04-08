@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>File Transfer Review — romantic-noyce</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px}.muted{color:#9fb0c8} table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top} th{background:#10182a}
+  </style>
+</head>
+<body>
+  <h1>File Transfer Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Отдельный технический отчёт по модулю передачи файлов: протокол, runtime-логика, баги, риски и улучшения.</p>
+
+  <div class="card good">
+    <h2>Короткий вывод</h2>
+    <p>Модуль передачи файлов <strong>уже сделан лучше среднего для MVP</strong>. Тут есть правильные инженерные решения: binary chunks вместо Base64, hash-проверка, temp-файл перед финальным перемещением, очередь отправки, поддержка передачи папок через relative path.</p>
+    <p>Но есть несколько важных мест, где логика пока <strong>не до конца корректна</strong> или <strong>недостаточно защищена</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что анализировалось</h2>
+    <ul>
+      <li><code>client/FileTransfer/FileTransferService.cs</code></li>
+      <li><code>client/FileTransfer/DataChannelFileTransferChannel.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.FileTransfer.cs</code></li>
+      <li><code>client/UiApp/FileTransferWindow.xaml.cs</code></li>
+      <li><code>client/WebRtcTransport/DataChannelCoordinator.cs</code></li>
+      <li><code>client/ZConect.Tests/FileTransferDiagnosticsTests.cs</code></li>
+    </ul>
+  </div>
+
+  <div class="card good">
+    <h2>Что уже хорошо</h2>
+    <ul>
+      <li><strong>Binary chunk protocol</strong> — хороший выбор. Убран Base64-overhead на основном пути.</li>
+      <li><strong>Есть hash verification</strong> на принимающей стороне.</li>
+      <li><strong>Есть temp-file стратегия</strong>: сначала запись в <code>.part</code>, потом move в final path.</li>
+      <li><strong>Есть очередь отправки</strong>, что упрощает lifecycle.</li>
+      <li><strong>Есть передача папок</strong> через <code>RelativePath</code>.</li>
+      <li><strong>Есть ACK/Error сообщения</strong> — это хорошая база для надёжного протокола.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>1. Самая важная логическая ошибка: transfer считается успешным слишком рано</h2>
+    <p><strong>Файл:</strong> <code>FileTransferService.cs</code></p>
+    <p>После отправки <code>file_end</code> sender сразу делает:</p>
+    <ul>
+      <li><code>RaiseProgress(... Completed)</code></li>
+      <li><code>RaiseCompleted(...)</code></li>
+    </ul>
+    <p>Но приёмник в этот момент ещё только:</p>
+    <ul>
+      <li>закрывает stream,</li>
+      <li>считает hash,</li>
+      <li>перемещает файл в final destination,</li>
+      <li>и только потом шлёт ACK.</li>
+    </ul>
+    <p><strong>Проблема:</strong> UI отправителя может показать «файл успешно отправлен», а потом реально прийдёт отрицательный ACK или ошибка приёма.</p>
+    <p><strong>Как должно быть:</strong></p>
+    <ul>
+      <li>после <code>file_end</code> outgoing transfer должен переходить в состояние <strong>Finishing / AwaitingAck</strong>;</li>
+      <li>в <strong>Completed</strong> он должен попадать только после <code>ACK success=true</code>.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>2. Нет жёсткого лимита на размер входящего binary chunk</h2>
+    <p><strong>Файлы:</strong> <code>DataChannelCoordinator.cs</code>, <code>FileTransferService.cs</code></p>
+    <p>На принимающей стороне пакет принимается целиком, chunk вырезается в новый массив, а затем может ещё и полностью распаковываться через GZip.</p>
+    <p><strong>Риск:</strong></p>
+    <ul>
+      <li>memory pressure;</li>
+      <li>CPU spike на распаковке;</li>
+      <li>OOM / фризы при oversized payload.</li>
+    </ul>
+    <p><strong>Что улучшить:</strong> ввести явный лимит, например:</p>
+    <ul>
+      <li>максимальный размер raw binary packet;</li>
+      <li>максимальный размер распакованного chunk;</li>
+      <li>abort transfer при нарушении лимитов.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>3. GZip по каждому chunk отдельно — рабочий, но не самый удачный компромисс</h2>
+    <p><strong>Файл:</strong> <code>FileTransferService.cs</code></p>
+    <p>Сейчас chunk либо отправляется как есть, либо отдельно gzip-сжимается, а на приёмнике отдельно распаковывается.</p>
+    <p><strong>Минусы:</strong></p>
+    <ul>
+      <li>CPU overhead на каждый chunk;</li>
+      <li>слабая эффективность по сравнению с потоковым сжатием;</li>
+      <li>на части форматов выигрыш почти нулевой.</li>
+    </ul>
+    <p><strong>Это не критический баг</strong>, но место для оптимизации есть.</p>
+  </div>
+
+  <div class="card med">
+    <h2>4. Подсчёт размера папок в dir list может тяжело тормозить</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.FileTransfer.cs</code></p>
+    <p>Для каждой директории вызывается:</p>
+    <pre>EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi =&gt; fi.Length)</pre>
+    <p><strong>Почему это плохо:</strong></p>
+    <ul>
+      <li>очень дорого на больших каталогах;</li>
+      <li>может подвешивать interactive listing;</li>
+      <li>не очень подходит для control-channel запроса.</li>
+    </ul>
+    <p><strong>Лучше:</strong></p>
+    <ul>
+      <li>в обычном listing не считать recursive folder size вообще;</li>
+      <li>или считать только по отдельному «Properties» запросу;</li>
+      <li>или делать ленивую подгрузку.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>5. Remote delete / create / file request слишком широкие по доверию</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.FileTransfer.cs</code></p>
+    <p>Сейчас удалённая сторона может запрашивать операции над произвольными путями файловой системы host'а.</p>
+    <p><strong>Для доверенной техподдержки это может быть ок</strong>, но с точки зрения безопасности это очень мощный канал управления.</p>
+    <p><strong>Что бы я улучшил:</strong></p>
+    <ul>
+      <li>ограничить операции рабочим root/path scope;</li>
+      <li>ввести режим подтверждения опасных операций;</li>
+      <li>логировать такие действия отдельно и явно.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>6. Queue есть, но semantically transfer state machine пока неполная</h2>
+    <p>Сейчас у outgoing transfer есть состояния вроде:</p>
+    <ul>
+      <li>InProgress</li>
+      <li>Paused</li>
+      <li>Completed</li>
+      <li>Failed</li>
+    </ul>
+    <p>Но для корректного протокола не хватает хотя бы ещё одного явного состояния:</p>
+    <ul>
+      <li><strong>AwaitingAck</strong></li>
+    </ul>
+    <p>Именно оно позволит корректно отделить:</p>
+    <ul>
+      <li>«байты уже отправлены»</li>
+      <li>от «получатель подтвердил успешный приём».</li>
+    </ul>
+  </div>
+
+  <div class="card low">
+    <h2>7. Использование relative path для папок — хорошее решение, но требует аккуратной валидации</h2>
+    <p>Сейчас relative path передаётся и используется для построения final destination. Это удобно, но важно следить, чтобы не было path traversal-подобных сюрпризов, если когда-нибудь источник relative path станет менее доверенным.</p>
+    <p>Сейчас у тебя путь выглядит контролируемым, но это место лучше заранее держать под контролем.</p>
+  </div>
+
+  <div class="card low">
+    <h2>8. Тесты по file transfer пока больше диагностические, чем поведенческие</h2>
+    <p><strong>Файл:</strong> <code>ZConect.Tests/FileTransferDiagnosticsTests.cs</code></p>
+    <p>Текущие тесты полезны, но в основном проверяют сериализацию payload и RequestId matching.</p>
+    <p><strong>Чего не хватает:</strong></p>
+    <ul>
+      <li>теста на ACK lifecycle;</li>
+      <li>теста на sequence mismatch;</li>
+      <li>теста на hash mismatch;</li>
+      <li>теста на cancel/pause/resume;</li>
+      <li>теста на relative-path folder receive.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Топ-5 практических исправлений</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что сделать</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Добавить состояние <strong>AwaitingAck</strong> и считать success только после ACK</td><td>Это главный логический баг</td></tr>
+      <tr><td>2</td><td>Ввести hard limit на chunk size и decompressed size</td><td>Защита от oversized payload / memory pressure</td></tr>
+      <tr><td>3</td><td>Убрать recursive folder size из обычного dir list</td><td>Ускорит файловую панель</td></tr>
+      <tr><td>4</td><td>Ограничить dangerous file ops root scope / confirmation policy</td><td>Снизит риск удалённых destructive операций</td></tr>
+      <tr><td>5</td><td>Добавить поведенческие тесты на ACK/hash/sequence/cancel</td><td>Чтобы модуль не ломался регрессиями</td></tr>
+    </table>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>Модуль передачи файлов у тебя уже <strong>реально хороший для стадии MVP</strong>. Его не надо переписывать. Его надо <strong>докрутить по корректности состояния, лимитам безопасности и поведению файловой панели</strong>. Если поправить это, он станет заметно взрослее и надёжнее.</p>
+  </div>
+</body>
+</html>

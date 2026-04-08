@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"zconect/server/internal/auth"
 	"zconect/server/internal/logging"
 	"zconect/server/internal/session"
 )
@@ -14,12 +15,14 @@ import (
 type Handler struct {
 	sessions *session.Service
 	logger   *logging.Logger
+	tokens   *auth.TokenService
 }
 
-func NewHandler(sessions *session.Service, logger *logging.Logger) *Handler {
+func NewHandler(sessions *session.Service, logger *logging.Logger, tokens *auth.TokenService) *Handler {
 	return &Handler{
 		sessions: sessions,
 		logger:   logger,
+		tokens:   tokens,
 	}
 }
 
@@ -28,10 +31,13 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/session/create", h.createSession)
 	mux.HandleFunc("/api/v1/session/join", h.joinSession)
 	mux.HandleFunc("/api/v1/session/close", h.closeSession)
+	mux.HandleFunc("/api/v1/session/refresh", h.refreshSession)
 }
 
 type createSessionRequest struct {
-	RequestUnattended bool `json:"request_unattended"`
+	RequestUnattended bool   `json:"request_unattended"`
+	ExpiresInSec      int    `json:"expires_in_sec,omitempty"`
+	MachineID         string `json:"machine_id,omitempty"`
 }
 
 type createSessionResponse struct {
@@ -55,7 +61,11 @@ func (h *Handler) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.sessions.Create(!req.RequestUnattended)
+	sess, err := h.sessions.CreateWithOpts(session.CreateOpts{
+		RequireConfirm: !req.RequestUnattended,
+		ExpiresInSec:   req.ExpiresInSec,
+		MachineID:      req.MachineID,
+	})
 	if err != nil {
 		h.logger.Log("ERROR", "API", "session_create_failed", "failed to create session", logging.Entry{Error: err.Error(), IP: clientIP(r)})
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
@@ -74,7 +84,7 @@ func (h *Handler) createSession(w http.ResponseWriter, r *http.Request) {
 		PassCode:     sess.PassCode,
 		ExpiresInSec: expiresIn,
 		WSURL:        "/ws",
-		WSToken:      "todo-short-lived-token",
+		WSToken:      h.tokens.Generate(sess.ID),
 	})
 }
 
@@ -130,7 +140,7 @@ func (h *Handler) joinSession(w http.ResponseWriter, r *http.Request) {
 		RequireConfirm: sess.RequireConfirm,
 		State:          string(sess.State),
 		WSURL:          "/ws",
-		WSToken:        "todo-short-lived-token",
+		WSToken:        h.tokens.Generate(sess.ID),
 	})
 }
 
@@ -162,6 +172,63 @@ func (h *Handler) closeSession(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Log("INFO", "API", "session_closed", "session closed", logging.Entry{SessionID: req.SessionID, IP: clientIP(r)})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type refreshSessionRequest struct {
+	SessionID    string `json:"session_id"`
+	ExpiresInSec int    `json:"expires_in_sec,omitempty"`
+}
+
+type refreshSessionResponse struct {
+	SessionID    string `json:"session_id"`
+	LoginCode    string `json:"login_code"`
+	PassCode     string `json:"pass_code"`
+	ExpiresInSec int    `json:"expires_in_sec"`
+	WSToken      string `json:"ws_token"`
+}
+
+func (h *Handler) refreshSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	var req refreshSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	if req.SessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "session_id is required"})
+		return
+	}
+
+	sess, err := h.sessions.Refresh(req.SessionID, req.ExpiresInSec)
+	if err != nil {
+		status := http.StatusNotFound
+		msg := "session not found"
+		if errors.Is(err, session.ErrExpired) {
+			status = http.StatusGone
+			msg = "session expired"
+		}
+		h.logger.Log("WARN", "API", "session_refresh_failed", msg, logging.Entry{Error: err.Error(), SessionID: req.SessionID, IP: clientIP(r)})
+		writeJSON(w, status, map[string]string{"error": msg})
+		return
+	}
+
+	expiresIn := int(time.Until(sess.ExpiresAt).Seconds())
+	if expiresIn < 0 {
+		expiresIn = 0
+	}
+
+	h.logger.Log("INFO", "API", "session_refreshed", "session password refreshed", logging.Entry{SessionID: sess.ID, IP: clientIP(r)})
+	writeJSON(w, http.StatusOK, refreshSessionResponse{
+		SessionID:    sess.ID,
+		LoginCode:    sess.LoginCode,
+		PassCode:     sess.PassCode,
+		ExpiresInSec: expiresIn,
+		WSToken:      h.tokens.Generate(sess.ID),
+	})
 }
 
 func (h *Handler) health(w http.ResponseWriter, r *http.Request) {

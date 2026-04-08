@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code Review — romantic-noyce / ZConect</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.55;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .sev-high{border-left:6px solid #ef4444}.sev-med{border-left:6px solid #f59e0b}.sev-low{border-left:6px solid #38bdf8}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px} .muted{color:#9fb0c8}.ok{color:#86efac}.warn{color:#fcd34d}.bad{color:#fca5a5}
+    table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top}
+    th{background:#10182a}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  </style>
+</head>
+<body>
+  <h1>Code Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Проект: <span class="mono">/media/sf_DW/romantic-noyce</span></p>
+
+  <div class="card">
+    <h2>Краткий вывод</h2>
+    <p>Проект уже выглядит как <strong>рабочий MVP с нормальной структурой</strong>: клиент разбит на модули, сервер вынесен отдельно, документации много. Это хороший фундамент. Основные проблемы не в том, что код «развален», а в трёх местах:</p>
+    <ul>
+      <li>есть <strong>дыры в безопасности и доверии к запросам</strong> на сервере;</li>
+      <li>в клиенте встречаются <strong>опасные паттерны завершения/ошибкообработки</strong>;</li>
+      <li>есть <strong>несколько архитектурных мест</strong>, которые сейчас ещё терпимы для MVP, но потом начнут мешать.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Что удалось проверить</h2>
+    <ul>
+      <li class="ok">Структуру репозитория и ключевые файлы клиента/сервера.</li>
+      <li class="ok">Серверную часть Go — просмотр кода + сборка/тесты <code>go build ./...</code> и <code>go test ./...</code>.</li>
+      <li class="warn">Клиентскую часть .NET/WPF удалось уже проверить лучше: .NET 8 SDK установлен, но сборка на Linux упирается в Windows-targeting.</li>
+    </ul>
+    <pre>error NETSDK1100: To build a project targeting Windows on this operating system, set the EnableWindowsTargeting property to true.</pre>
+  </div>
+
+  <h2>Найденные проблемы и улучшения</h2>
+
+  <div class="card sev-high">
+    <h3>1. Серверные endpoints доверяют клиенту слишком сильно</h3>
+    <p><strong>Файлы:</strong> <code>server/internal/api/handler.go</code></p>
+    <p>Проблема: <code>/api/v1/session/close</code> и <code>/api/v1/session/refresh</code> принимают только <code>session_id</code>. То есть любой, кто узнал ID сессии, потенциально может закрыть её или обновить пароль, если у него есть доступ к API.</p>
+    <p><strong>Почему это плохо:</strong> для удалённого доступа это критичный контур доверия. <code>session_id</code> не должен быть единственным подтверждением владения сессией.</p>
+    <p><strong>Что улучшить:</strong></p>
+    <ul>
+      <li>требовать отдельный host-token / owner-token для refresh/close;</li>
+      <li>разделить токены host/viewer;</li>
+      <li>не делать управление сессией только по knowledge-based идентификатору.</li>
+    </ul>
+  </div>
+
+  <div class="card sev-high">
+    <h3>2. <code>ws_token</code> сейчас заглушка, а WebSocket — ключевая часть безопасности</h3>
+    <p><strong>Файлы:</strong> <code>README.md</code>, <code>server/README.md</code>, косвенно <code>server/internal/auth/token.go</code> / signaling handler</p>
+    <p>В документации прямо указано, что боевой <code>ws_token</code> ещё не доделан. Для MVP это ок, но для реального использования это одно из главных мест риска.</p>
+    <p><strong>Что улучшить:</strong></p>
+    <ul>
+      <li>сделать короткоживущий подписанный токен с role/session binding;</li>
+      <li>валидировать token на upgrade в <code>/ws</code>;</li>
+      <li>добавить replay protection или хотя бы очень короткий TTL.</li>
+    </ul>
+  </div>
+
+  <div class="card sev-med">
+    <h3>3. Нет ограничения тела JSON-запроса</h3>
+    <p><strong>Файл:</strong> <code>server/internal/api/handler.go</code></p>
+    <p>Во всех HTTP handlers используется обычный <code>json.NewDecoder(r.Body)</code> без <code>http.MaxBytesReader</code>.</p>
+    <p><strong>Риск:</strong> лишняя поверхность для DoS / memory pressure на мусорных больших запросах.</p>
+    <p><strong>Что улучшить:</strong> перед decode ограничить размер тела, например 4–16 KB для этих endpoint'ов.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>4. <code>join</code> валидирует длину кодов, но не проверяет, что это именно цифры</h3>
+    <p><strong>Файл:</strong> <code>server/internal/api/handler.go</code></p>
+    <p>Сейчас проверяется только <code>len(req.LoginCode) != 8 || len(req.PassCode) != 8</code>.</p>
+    <p><strong>Что улучшить:</strong> явно валидировать формат: только <code>[0-9]{8}</code>. Это мелочь, но интерфейс и API будут честнее согласованы.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>5. Закрытые/протухшие сессии не всегда сразу удаляются из индексов</h3>
+    <p><strong>Файл:</strong> <code>server/internal/session/service.go</code></p>
+    <p>В <code>Join</code> при expired-сессии состояние меняется на <code>StateClosed</code>, но запись продолжает жить в индексах до prune/cleanup. Это не баг-катастрофа, но добавляет путаницу и лишнее состояние.</p>
+    <p><strong>Что улучшить:</strong> централизовать cleanup индексов для expired/closed session прямо в критических ветках.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>6. Клиент завершает приложение через <code>Environment.Exit(0)</code></h3>
+    <p><strong>Файл:</strong> <code>client/UiApp/MainWindow.xaml.cs</code></p>
+    <p>В конце <code>OnClosingAsync</code> вызывается и <code>Application.Current.Shutdown()</code>, и затем <code>Environment.Exit(0)</code>.</p>
+    <p><strong>Почему это плохо:</strong></p>
+    <ul>
+      <li>жёсткий выход может оборвать flush/dispose/async cleanup;</li>
+      <li>усложняет корректное завершение WPF lifecycle;</li>
+      <li>маскирует реальные зависания shutdown вместо их исправления.</li>
+    </ul>
+    <p><strong>Что улучшить:</strong> оставить один контролируемый путь завершения, а не принудительный процесс-килл.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>7. В клиенте много мест с <code>catch { /* ignore */ }</code></h3>
+    <p><strong>Файлы:</strong> особенно <code>MainWindow.xaml.cs</code>, вероятно и другие UI-модули</p>
+    <p>Для MVP это помогает не падать, но в реальности такие блоки скрывают проблемы и ломают диагностику.</p>
+    <p><strong>Что улучшить:</strong></p>
+    <ul>
+      <li>логировать хотя бы debug/warn;</li>
+      <li>использовать единый helper для safe-exec с логированием;</li>
+      <li>молча игнорировать только truly harmless сценарии.</li>
+    </ul>
+  </div>
+
+  <div class="card sev-med">
+    <h3>8. <code>MainViewModel</code> очень большой и тянет на god-object</h3>
+    <p><strong>Файл:</strong> <code>client/UiApp/ViewModels/MainViewModel.cs</code> + partial pieces</p>
+    <p>Хорошо, что он уже разбит на partial-файлы, но объект всё равно держит слишком много ответственности: сеть, clipboard, input, session lifecycle, file transfer, UAC, contacts, UI state, timers, diagnostics.</p>
+    <p><strong>Риск:</strong> любое изменение начинает цеплять всё сразу, растёт вероятность регрессий.</p>
+    <p><strong>Что улучшить:</strong></p>
+    <ul>
+      <li>выделить отдельные coordinator/service-объекты: session lifecycle, remote desktop, clipboard sync, transfer orchestration;</li>
+      <li>оставить во ViewModel в основном binding-state и команды.</li>
+    </ul>
+  </div>
+
+  <div class="card sev-low">
+    <h3>9. Жёсткая привязка UI к Win32/NotifyIcon прямо в code-behind</h3>
+    <p><strong>Файл:</strong> <code>client/UiApp/MainWindow.xaml.cs</code></p>
+    <p>Это допустимо для MVP, но дальше будет мешать тестируемости и сопровождению.</p>
+    <p><strong>Что улучшить:</strong> вынести tray/notification/window flashing в отдельный UI service.</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>10. В API логируется client IP, но нет нормальной reverse-proxy стратегии</h3>
+    <p><strong>Файл:</strong> <code>server/internal/api/handler.go</code></p>
+    <p><code>clientIP()</code> берёт только <code>r.RemoteAddr</code>. Если сервер будет стоять за reverse proxy, логи и rate limit могут стать неинформативными.</p>
+    <p><strong>Что улучшить:</strong> либо явно документировать direct mode only, либо аккуратно поддержать доверенный proxy режим.</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>11. Несогласованность naming/branding</h3>
+    <p><strong>Файлы:</strong> по всему проекту — <code>ZConect</code>, <code>ZConnect</code>, <code>Zconnect</code></p>
+    <p>Это не bug, но влияет на доверие и аккуратность продукта.</p>
+    <p><strong>Что улучшить:</strong> выбрать единый canonical brand name и оставить старое имя только там, где ломается совместимость (repo/package IDs).</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>12. Нет автоматической технической проверки в CI, по крайней мере в корне проекта она не видна</h3>
+    <p>Не обнаружены явные workflow/CI-конфиги в просмотренной структуре.</p>
+    <p><strong>Факт проверки:</strong> серверные тесты <code>go test ./...</code> проходят, клиентскую Windows-сборку нужно гонять либо на Windows runner, либо на Linux с корректно включённым Windows-targeting.</p>
+    <p><strong>Что улучшить:</strong></p>
+    <ul>
+      <li>Go: <code>go test ./...</code>, <code>go vet</code></li>
+      <li>.NET: build + tests на .NET 8 runner</li>
+      <li>отчёт по артефактам релиза</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Подтверждённые сильные стороны</h2>
+    <ul>
+      <li>Хорошая модульность по папкам: <code>ScreenCapture</code>, <code>SessionClient</code>, <code>WebRtcTransport</code>, <code>FileTransfer</code>.</li>
+      <li>Есть документация по архитектуре, API, деплою, релизу.</li>
+      <li>Для UI уже есть попытка держать MVVM и выносить логику в partial viewmodel.</li>
+      <li>Сервер маленький и читаемый — это плюс для MVP.</li>
+      <li>Есть тестовый проект <code>client/ZConect.Tests</code>, это хороший знак.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Что бы я делал дальше по приоритету</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что сделать</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Закрыть безопасность session control / ws token</td><td>Это главный риск для реального удалённого доступа</td></tr>
+      <tr><td>2</td><td>Поднять CI и сборки .NET 8 + Go</td><td>Чтобы не ловить регрессии руками</td></tr>
+      <tr><td>3</td><td>Сократить silent catches и улучшить логирование ошибок</td><td>Упростит отладку боевых багов</td></tr>
+      <tr><td>4</td><td>Дробить MainViewModel дальше</td><td>Сейчас ещё терпимо, позже станет больно</td></tr>
+      <tr><td>5</td><td>Дожать API validation и cleanup semantics</td><td>Улучшит предсказуемость поведения</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Отдельно: ограничения этого ревью</h2>
+    <ul>
+      <li>Клиент под Windows/.NET 8 не был полноценно собран как GUI-приложение в текущем Linux-окружении: теперь причина не в SDK, а в том, что проект Windows-targeted.</li>
+      <li>Не проводился dynamic/runtime test WebRTC-потока и UI вживую.</li>
+      <li>Часть замечаний — архитектурные и security-oriented, а не только compile-time ошибки.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Дополнительный аудит: клиент, сервер, ICE и видеопоток</h2>
+    <p>Ниже — отдельный технический разбор не только по коду, но и по <strong>runtime-архитектуре</strong>: как живут клиент и сервер, как устроена ICE-логика, и как формируется/едет поток удалённого рабочего стола.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>13. Клиентская orchestration-логика уже перегружена</h3>
+    <p><strong>Файлы:</strong> <code>client/UiApp/ViewModels/MainViewModel.Connection.cs</code>, <code>MainViewModel.Video.cs</code>, <code>MainViewModel.cs</code></p>
+    <p><code>MainViewModel</code> сейчас управляет почти всем runtime:</p>
+    <ul>
+      <li>создание/подключение сессии;</li>
+      <li>WS lifecycle;</li>
+      <li>reconnect / reset;</li>
+      <li>ICE upgrade monitor;</li>
+      <li>data channel init;</li>
+      <li>clipboard / cursor loops;</li>
+      <li>video stats / RTT / health checks.</li>
+    </ul>
+    <p><strong>Вывод:</strong> для MVP ещё допустимо, но это уже не просто ViewModel, а фактически runtime orchestrator. Дальше лучше выносить это в отдельные coordinator/service-слои.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>14. Signaling-сервер слишком «тупой», поэтому клиенту приходится компенсировать это костылями</h3>
+    <p><strong>Файлы:</strong> <code>server/internal/signaling/handler.go</code>, <code>client/UiApp/ViewModels/MainViewModel.Connection.cs</code></p>
+    <p>Сервер просто relay'ит сообщения между двумя peer'ами. Это хорошее MVP-решение, но из-за отсутствия очереди/буферизации клиент вынужден сам обходить lost-offer сценарий:</p>
+    <ul>
+      <li>deferred caller start;</li>
+      <li>ожидание <code>peer_state</code>;</li>
+      <li>таймерный fallback на старт offer через 1500 ms.</li>
+    </ul>
+    <p><strong>Вывод:</strong> signaling архитектура рабочая, но хрупкая. Лучше либо добавить server-side readiness handshake, либо буферизацию критичных signaling-сообщений.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>15. Возможна race-condition при подключении двух peer'ов в одну сессию</h3>
+    <p><strong>Файл:</strong> <code>server/internal/signaling/handler.go</code></p>
+    <p>Проверка <code>len(peers) &gt;= 2</code> и последующий <code>hub.Add(peer)</code> не атомарны. При почти одновременном подключении двух клиентов это теоретически может позволить проскочить лишнему peer'у.</p>
+    <p><strong>Что улучшить:</strong> резервировать слот атомарно внутри hub/session manager.</p>
+  </div>
+
+  <div class="card sev-high">
+    <h3>16. Определение ICE route сделано по observed candidates, а не по selected pair</h3>
+    <p><strong>Файлы:</strong> <code>client/WebRtcTransport/SignalingCoordinator.cs</code>, <code>MainViewModel.Connection.cs</code></p>
+    <p>Сейчас тип маршрута выводится по последним замеченным ICE candidate types (<code>host</code> / <code>srflx</code> / <code>relay</code>). Но кандидат, который был замечен, не обязательно является тем, который реально стал <em>selected/nominated pair</em>.</p>
+    <p><strong>Риск:</strong></p>
+    <ul>
+      <li>ложные выводы о текущем route;</li>
+      <li>неправильные решения в ICE upgrade monitor;</li>
+      <li>лишние ICE restart.</li>
+    </ul>
+    <p><strong>Что улучшить:</strong> брать active/selected candidate pair из реальных WebRTC stats, если библиотека это позволяет.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>17. ICE upgrade стратегия хорошая по идее, но местами слишком шумная</h3>
+    <p><strong>Файл:</strong> <code>MainViewModel.Connection.cs</code></p>
+    <p>Текущий подход <strong>all candidates first, upgrade later</strong> сам по себе разумный и лучше многих sequential fallback-схем. Но monitor опирается на:</p>
+    <ul>
+      <li>network change events;</li>
+      <li>грубый route inference;</li>
+      <li>серии restart'ов при подозрении на degradation.</li>
+    </ul>
+    <p><strong>Риск:</strong> шумные рестарты при VPN / virtual adapters / сетевых дребезгах.</p>
+    <p><strong>Что улучшить:</strong> ввести cooldown, restart budget, и опираться ещё и на packet loss / bitrate / selected pair stats.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>18. ICE restart сделан через ручную правку SDP</h3>
+    <p><strong>Файл:</strong> <code>client/WebRtcTransport/SignalingCoordinator.cs</code></p>
+    <p><code>ForceIceRestart()</code> меняет <code>a=ice-ufrag</code> и <code>a=ice-pwd</code> через regex. Это рабочий workaround, но хрупкий.</p>
+    <p><strong>Риск:</strong> если библиотека ожидает штатный restart API или internal state machine более сложная, ручная замена SDP может вести себя нестабильно на части сценариев.</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>19. Видео-конвейер на host сделан уже неплохо</h3>
+    <p><strong>Файлы:</strong> <code>client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</code>, <code>MainViewModel.Video.cs</code></p>
+    <p><strong>Плюсы текущей реализации:</strong></p>
+    <ul>
+      <li>DXGI как основной путь + GDI fallback;</li>
+      <li>поддержка single display и all displays;</li>
+      <li>double buffering для захвата и кодировщика;</li>
+      <li>adaptive capture speed / frame skip;</li>
+      <li>viewer-side buffer pool.</li>
+    </ul>
+    <p>Для MVP это уже сильная часть проекта.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>20. Но <code>MixedRealityPeerConnectionAgent</code> уже стал слишком большим runtime-компонентом</h3>
+    <p><strong>Файл:</strong> <code>client/WebRtcTransport/MixedRealityPeerConnectionAgent.cs</code></p>
+    <p>Внутри одного класса сейчас живут:</p>
+    <ul>
+      <li>PeerConnection lifecycle;</li>
+      <li>transceiver management;</li>
+      <li>local track attach;</li>
+      <li>DXGI capture;</li>
+      <li>GDI capture;</li>
+      <li>scaling;</li>
+      <li>adaptive FPS;</li>
+      <li>remote frame delivery;</li>
+      <li>viewer buffer pooling.</li>
+    </ul>
+    <p><strong>Вывод:</strong> это не баг само по себе, но дальше сопровождать такой класс будет тяжело. Стоит дробить на capture pipeline / peer wrapper / viewer frame adapter.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>21. Viewer-side video path делает минимум одну лишнюю полную копию кадра</h3>
+    <p><strong>Файлы:</strong> <code>MixedRealityPeerConnectionAgent.cs</code>, <code>MainViewModel.Video.cs</code></p>
+    <p>Сначала кадр копируется из native frame в managed buffer, потом ещё переписывается в <code>WriteableBitmap</code>. Для MVP это нормально, но на высоких разрешениях и слабых ПК может стать bottleneck.</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>22. Подход с ожиданием data channel как доказательства connectivity — правильный</h3>
+    <p><strong>Файл:</strong> <code>MainViewModel.Connection.cs</code></p>
+    <p>Это сильное место архитектуры. Ты ждёшь не просто обмен ICE/SDP, а <strong>реальное открытие data channel</strong> (и вторично first remote frame). Это гораздо честнее, чем считать успешным сам факт обмена кандидатами.</p>
+  </div>
+
+  <div class="card">
+    <h2>Отдельный аудит: передача файлов</h2>
+    <p>Файловый обмен в проекте уже выглядит как рабочий модуль, а не просто набросок: есть queue, chunking, hash-проверка, binary path без Base64, относительные пути для папок, запросы на dir list / create folder / delete. Но есть несколько важных багов и рисков.</p>
+  </div>
+
+  <div class="card sev-high">
+    <h3>23. Отправитель помечает transfer как Completed до получения ACK от получателя</h3>
+    <p><strong>Файл:</strong> <code>client/FileTransfer/FileTransferService.cs</code></p>
+    <p>После <code>SendFileEndAsync()</code> отправитель сразу вызывает <code>RaiseProgress(... Completed)</code> и <code>RaiseCompleted(...)</code>. Но реальный успех ещё не подтверждён: получатель только потом проверяет hash, двигает файл и отправляет ACK.</p>
+    <p><strong>Риск:</strong> UI может показать «файл отправлен», а потом прилетит <code>file_ack success=false</code> или ошибка на стороне приёма.</p>
+    <p><strong>Что улучшить:</strong> считать outgoing transfer завершённым только после положительного ACK.</p>
+  </div>
+
+  <div class="card sev-high">
+    <h3>24. Нет ограничения на размер входящего binary chunk / payload</h3>
+    <p><strong>Файлы:</strong> <code>client/WebRtcTransport/DataChannelCoordinator.cs</code>, <code>client/FileTransfer/FileTransferService.cs</code></p>
+    <p>Получатель принимает binary chunk целиком в память, а затем при необходимости ещё и распаковывает его целиком через GZip. Явного предела на размер chunk'а на принимающей стороне не видно.</p>
+    <p><strong>Риск:</strong> peer может отправить oversized chunk и устроить memory pressure / OOM / CPU spike на распаковке.</p>
+    <p><strong>Что улучшить:</strong> ввести жёсткий max chunk size на wire-уровне и отклонять всё, что выше лимита.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>25. Сжатие GZip делается покусково, что даёт лишнюю CPU-нагрузку и нестабильный выигрыш</h3>
+    <p><strong>Файл:</strong> <code>client/FileTransfer/FileTransferService.cs</code></p>
+    <p>Каждый chunk независимо gzip-сжимается и независимо распаковывается. Это рабоче, но не оптимально:</p>
+    <ul>
+      <li>теряется выгода межчанкового контекста;</li>
+      <li>растёт CPU overhead;</li>
+      <li>на части файлов выгода будет спорной.</li>
+    </ul>
+    <p><strong>Это не критический баг</strong>, но архитектурно лучше либо не сжимать вовсе на datachannel-уровне, либо делать это более осмысленно.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>26. Рекурсивный расчёт размера папки при dir list может быть очень дорогим</h3>
+    <p><strong>Файл:</strong> <code>client/UiApp/ViewModels/MainViewModel.FileTransfer.cs</code></p>
+    <p><code>GetDirectorySizeSafe()</code> делает <code>EnumerateFiles(..., AllDirectories).Sum(...)</code> для каждой директории. На больших дисках и глубоких деревьях это может тормозить ответ dir list очень сильно.</p>
+    <p><strong>Риск:</strong> зависания/долгие паузы файловой панели и тяжёлые запросы по control channel.</p>
+    <p><strong>Что улучшить:</strong> не считать полный recursive size при обычном listing или делать это лениво/по требованию.</p>
+  </div>
+
+  <div class="card sev-med">
+    <h3>27. <code>Directory.Delete(..., recursive: true)</code> без песочницы — очень опасный remote operation</h3>
+    <p><strong>Файл:</strong> <code>client/UiApp/ViewModels/MainViewModel.FileTransfer.cs</code></p>
+    <p>Удалённая сторона может запросить delete любого пути, и host попытается удалить файл/директорию по абсолютному пути.</p>
+    <p><strong>Риск:</strong> слишком широкие полномочия для remote file operations. Для trusted-support сценария это может быть допустимо, но для безопасности это очень сильный рычаг.</p>
+    <p><strong>Что улучшить:</strong> хотя бы ограничить операции выбранным root / рабочей областью или ввести режим подтверждения опасных операций.</p>
+  </div>
+
+  <div class="card sev-low">
+    <h3>28. Сервис уже использует правильные инженерные идеи</h3>
+    <p><strong>Файл:</strong> <code>client/FileTransfer/FileTransferService.cs</code></p>
+    <ul>
+      <li>переход на binary chunks вместо Base64 — хороший шаг;</li>
+      <li>есть hash verification;</li>
+      <li>есть temp file + move в final path;</li>
+      <li>есть queue для последовательной отправки;</li>
+      <li>есть поддержка передачи папок через relative path.</li>
+    </ul>
+    <p>То есть модуль уже неплохой — его надо не переписывать, а дожимать по корректности и безопасности.</p>
+  </div>
+
+  <div class="card">
+    <h2>Итог</h2>
+    <p>У проекта <strong>хороший MVP-фундамент</strong>. Главная работа сейчас — не переписывать всё, а <strong>докрутить безопасность, диагностику, signaling lifecycle, честную телеметрию ICE и корректность file transfer ACK/validation</strong>. Видео-пайплайн уже неплохой, а вот reconnect/upgrade/runtime orchestration и file-transfer safety — это места, куда стоит смотреть в первую очередь.</p>
+  </div>
+</body>
+</html>

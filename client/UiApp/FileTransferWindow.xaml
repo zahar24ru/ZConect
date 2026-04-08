@@ -1,0 +1,327 @@
+<Window x:Class="UiApp.FileTransferWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ZConect — Передача файлов (двухпанельный режим)"
+        MinWidth="800"
+        MinHeight="520"
+        Width="960"
+        Height="580"
+        WindowStartupLocation="CenterScreen"
+        Background="#F0F4F8">
+    <Window.Resources>
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="BorderBrush" Value="#D7E2EF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- File item template with icon -->
+        <DataTemplate x:Key="FileItemTemplate">
+            <StackPanel Orientation="Horizontal" Margin="0,1">
+                <Viewbox Width="16" Height="16" Margin="0,0,6,0">
+                    <Path Data="{Binding IconGeometry}" Fill="{Binding IconColor}"/>
+                </Viewbox>
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="Foreground" Value="#155FA2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding SizeText}" Margin="12,0,0,0" Foreground="#666" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовки -->
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Локально (этот ПК)" FontWeight="SemiBold" Foreground="#1F2E3D"/>
+                <TextBlock Text="Входящие файлы сохраняются в эту папку — откройте здесь нужную папку" FontSize="11" Foreground="#5A6C7D" Margin="0,2,0,0"/>
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{Binding RightPanelTitle}" FontWeight="SemiBold" Foreground="#1F2E3D"/>
+        </Grid>
+
+        <!-- Две панели + центр -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Левая панель: тулбар над адресной строкой -->
+            <Border Grid.Column="0" Background="White" BorderBrush="#D7E2EF" BorderThickness="1" CornerRadius="6" Margin="0,0,4,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="6,6,6,4">
+                        <Button Content="⌂" Command="{Binding HomeLeftCommand}" Width="32" ToolTip="Домой (диски)" Margin="0,0,4,0"/>
+                        <Button Content="↑" Command="{Binding ParentLeftCommand}" Width="32" ToolTip="Наверх" Margin="0,0,4,0"/>
+                        <Button Content="⟳" Command="{Binding RefreshLeftCommand}" Width="32" ToolTip="Обновить" Margin="0,0,4,0"/>
+                        <Button Content="+ Папка" Command="{Binding CreateFolderLeftCommand}" ToolTip="Новая папка" Margin="0,0,8,0"/>
+                        <ComboBox Width="90" Height="24" FontSize="11"
+                                  ItemsSource="{Binding SortOptions}" DisplayMemberPath="Label"
+                                  SelectedItem="{Binding LeftSortOption}"
+                                  ToolTip="Сортировка"/>
+                    </StackPanel>
+                    <!-- Breadcrumb navigation -->
+                    <Border Grid.Row="1" Margin="6,0,6,6" BorderBrush="#D7E2EF" BorderThickness="1"
+                            Background="White" CornerRadius="3" Padding="4,2" MinHeight="26">
+                        <ItemsControl ItemsSource="{Binding LeftBreadcrumbs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Label}" Cursor="Hand" FontSize="12"
+                                                   Foreground="#155FA2" Margin="0,0,0,0"
+                                                   MouseDown="LeftBreadcrumb_Click" Tag="{Binding FullPath}"
+                                                   ToolTip="{Binding FullPath}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="TextDecorations" Value="Underline"/>
+                                                        </Trigger>
+                                                        <DataTrigger Binding="{Binding IsLast}" Value="True">
+                                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            <Setter Property="Foreground" Value="#1F2E3D"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="  ›  " Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLast}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    <ListBox x:Name="LeftList" Grid.Row="2" Margin="6" ItemsSource="{Binding LeftItems}"
+                             SelectionMode="Extended" SelectionChanged="LeftList_OnSelectionChanged"
+                             MouseDoubleClick="LeftList_OnMouseDoubleClick"
+                             KeyDown="LeftList_OnKeyDown"
+                             ItemTemplate="{StaticResource FileItemTemplate}"
+                             BorderThickness="0" Background="Transparent">
+                        <ListBox.ContextMenu>
+                            <ContextMenu Placement="Right">
+                                <MenuItem Header="Свойства" Command="{Binding ShowPropertiesLeftCommand}"/>
+                                <MenuItem Header="Удалить" Command="{Binding DeleteLeftCommand}"/>
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Центр: стрелки направления передачи -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8">
+                <Button Content="←" FontSize="18" FontWeight="Bold" Width="48" Height="40" Margin="0,0,0,8"
+                        Command="{Binding SendFromRightToRemoteCommand}"
+                        ToolTip="Передать выбранные файлы с правой панели на удалённую сторону"/>
+                <Button Content="→" FontSize="18" FontWeight="Bold" Width="48" Height="40"
+                        Command="{Binding SendToRemoteCommand}"
+                        ToolTip="Передать выбранные файлы с левой панели на удалённую сторону"/>
+            </StackPanel>
+
+            <!-- Правая панель: тулбар над адресной строкой -->
+            <Border Grid.Column="2" Background="White" BorderBrush="#D7E2EF" BorderThickness="1" CornerRadius="6" Margin="4,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="6,6,6,4">
+                        <Button Content="⌂" Command="{Binding HomeRightCommand}" Width="32" ToolTip="Домой (диски)" Margin="0,0,4,0"/>
+                        <Button Content="↑" Command="{Binding ParentRightCommand}" Width="32" ToolTip="Наверх" Margin="0,0,4,0"/>
+                        <Button Content="⟳" Command="{Binding RefreshRightCommand}" Width="32" ToolTip="Обновить" Margin="0,0,4,0"/>
+                        <Button Content="+ Папка" Command="{Binding CreateFolderRightCommand}" ToolTip="Новая папка" Margin="0,0,8,0"/>
+                        <ComboBox Width="90" Height="24" FontSize="11"
+                                  ItemsSource="{Binding SortOptions}" DisplayMemberPath="Label"
+                                  SelectedItem="{Binding RightSortOption}"
+                                  ToolTip="Сортировка"/>
+                    </StackPanel>
+                    <!-- Breadcrumb navigation -->
+                    <Border Grid.Row="1" Margin="6,0,6,6" BorderBrush="#D7E2EF" BorderThickness="1"
+                            Background="#F6FAFF" CornerRadius="3" Padding="4,2" MinHeight="26">
+                        <ItemsControl ItemsSource="{Binding RightBreadcrumbs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Label}" Cursor="Hand" FontSize="12"
+                                                   Foreground="#155FA2" Margin="0,0,0,0"
+                                                   MouseDown="RightBreadcrumb_Click" Tag="{Binding FullPath}"
+                                                   ToolTip="{Binding FullPath}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="TextDecorations" Value="Underline"/>
+                                                        </Trigger>
+                                                        <DataTrigger Binding="{Binding IsLast}" Value="True">
+                                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            <Setter Property="Foreground" Value="#1F2E3D"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="  ›  " Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLast}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    <Grid Grid.Row="2" Margin="6">
+                        <TextBlock Text="Загрузка…" Foreground="#666" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding RightPanelLoading, Converter={StaticResource BoolToVis}}"/>
+                        <ListBox x:Name="RightList" ItemsSource="{Binding RightItems}"
+                                 SelectionMode="Extended" SelectionChanged="RightList_OnSelectionChanged"
+                                 MouseDoubleClick="RightList_OnMouseDoubleClick"
+                                 KeyDown="RightList_OnKeyDown"
+                                 ItemTemplate="{StaticResource FileItemTemplate}"
+                                 BorderThickness="0" Background="Transparent">
+                            <ListBox.ContextMenu>
+                                <ContextMenu Placement="Right">
+                                    <MenuItem Header="Свойства" Command="{Binding ShowPropertiesRightCommand}"/>
+                                    <MenuItem Header="Удалить" Command="{Binding DeleteRightCommand}"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Статус -->
+        <Border Grid.Row="2" Margin="0,6,0,0" Padding="6,4" Background="#E0E8F0" CornerRadius="4" BorderBrush="#D7E2EF" BorderThickness="1">
+            <TextBlock Text="{Binding StatusText}" Foreground="#1F2E3D" TextWrapping="Wrap" FontSize="12"/>
+        </Border>
+
+        <!-- Список передач -->
+        <Border Grid.Row="3" Margin="0,4,0,0" Padding="0" Background="White" CornerRadius="6"
+                BorderBrush="#D7E2EF" BorderThickness="1" MaxHeight="180">
+            <Grid>
+                <!-- Empty state -->
+                <TextBlock Text="Нет передач" Foreground="#9CA3AF" FontSize="12" HorizontalAlignment="Center"
+                           VerticalAlignment="Center" Margin="0,14">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Transfers.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Transfers}" Margin="6,4,6,4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,2" Padding="6,4" CornerRadius="4" Background="#F8FAFC">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <!-- Direction arrow -->
+                                        <TextBlock Grid.Column="0" Grid.RowSpan="2" Text="{Binding DirectionIcon}"
+                                                   FontSize="14" FontWeight="Bold" Foreground="{Binding StatusColor}"
+                                                   VerticalAlignment="Center"/>
+                                        <!-- File name -->
+                                        <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}"
+                                                   FontSize="12" Foreground="#1F2E3D" TextTrimming="CharacterEllipsis"/>
+                                        <!-- Progress bar -->
+                                        <ProgressBar Grid.Column="1" Grid.Row="1" Height="6"
+                                                     Minimum="0" Maximum="1" Value="{Binding ProgressValue, Mode=OneWay}"
+                                                     BorderThickness="0" Margin="0,2,8,0">
+                                            <ProgressBar.Style>
+                                                <Style TargetType="ProgressBar">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ProgressBar.Style>
+                                        </ProgressBar>
+                                        <!-- Progress text + ETA -->
+                                        <TextBlock Grid.Column="2" Grid.Row="0" FontSize="11" Foreground="#666"
+                                                   VerticalAlignment="Center" Margin="4,0">
+                                            <Run Text="{Binding ProgressText, Mode=OneWay}"/>
+                                        </TextBlock>
+                                        <!-- Speed / Status -->
+                                        <StackPanel Grid.Column="2" Grid.Row="1" Orientation="Horizontal" Margin="4,0">
+                                            <TextBlock Text="{Binding StatusText, Mode=OneWay}" FontSize="10"
+                                                       Foreground="{Binding StatusColor}"/>
+                                            <TextBlock Text="{Binding EtaText, Mode=OneWay}" FontSize="10"
+                                                       Foreground="#9CA3AF" Margin="6,0,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

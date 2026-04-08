@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Input & Clipboard Review — romantic-noyce</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px}.muted{color:#9fb0c8} table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top} th{background:#10182a}
+  </style>
+</head>
+<body>
+  <h1>Input & Clipboard Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Отдельный отчёт по передаче мыши, клавиатуры, курсора и буфера обмена.</p>
+
+  <div class="card good">
+    <h2>Короткий вывод</h2>
+    <p>Подсистема input/clipboard уже построена на хорошей базе: есть отдельные payload'ы, viewer-side coordinate mapping, host-side injection service, cursor sync, pressed-key tracking, clipboard echo suppression и release-all-keys on disconnect.</p>
+    <p>Но есть несколько важных логических и UX-рискованных мест: особенно вокруг клавиатурных модификаторов, fire-and-forget отправки input, и polling-based clipboard sync.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что анализировалось</h2>
+    <ul>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Input.cs</code></li>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Clipboard.cs</code></li>
+      <li><code>client/UiApp/Services/WindowsInputInjectionService.cs</code></li>
+      <li><code>client/WebRtcTransport/DataChannelModels.cs</code></li>
+      <li><code>client/WebRtcTransport/DataChannelCoordinator.cs</code></li>
+    </ul>
+  </div>
+
+  <div class="card good">
+    <h2>Что уже хорошо</h2>
+    <ul>
+      <li><strong>Coordinate mapping у viewer'а сделан аккуратно.</strong> Учтены масштаб, letterbox, capture rect.</li>
+      <li><strong>Есть pressed key tracking</strong> и release-all при потере фокуса/cleanup.</li>
+      <li><strong>Cursor shape sync</strong> отделён от основного mouse input потока.</li>
+      <li><strong>Clipboard echo suppression уже есть</strong> — это хороший знак, потому что loopback здесь частая проблема.</li>
+      <li><strong>Host-side injection вынесен в отдельный service</strong>, а не размазан по UI-коду.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>1. Главный риск по клавиатуре: модификаторы передаются дважды в некоторых сценариях</h2>
+    <p><strong>Файл:</strong> <code>WindowsInputInjectionService.cs</code></p>
+    <p>Сейчас логика такая:</p>
+    <ul>
+      <li>для немодификаторных клавиш host перед нажатием/отпусканием основной клавиши сам нажимает/отпускает модификаторы из payload;</li>
+      <li>но сами модификаторы viewer также может отдельно слать как обычные key down/up события.</li>
+    </ul>
+    <p><strong>Риск:</strong> возможны дубли/несогласованность состояний Ctrl/Shift/Alt/Win, особенно при быстрых комбинациях или если сеть теряет часть input-событий.</p>
+    <p><strong>Что лучше:</strong> выбрать одну модель:</p>
+    <ul>
+      <li>либо modifiers живут как отдельные события и host не «оборачивает» ими обычные клавиши;</li>
+      <li>либо payload описывает chord, и viewer не шлёт modifier down/up отдельно.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>2. Fire-and-forget отправка input скрывает ошибки и упорядочивание</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Input.cs</code></p>
+    <p><code>SafeSendMouseAsync()</code> и <code>SafeSendKeyboardAsync()</code> запускают отдельные Task.Run и в случае проблем только quietly log'ируют debug.</p>
+    <p><strong>Риски:</strong></p>
+    <ul>
+      <li>сложно понимать, что input path реально уже развалился;</li>
+      <li>сложно поддерживать строгий ordering для keyboard events;</li>
+      <li>часть ошибок может быть почти невидима пользователю.</li>
+    </ul>
+    <p>Для responsiveness это ок, но transport-гарантии тут довольно слабые.</p>
+  </div>
+
+  <div class="card med">
+    <h2>3. Mouse move throttling есть, но не привязано к реальной пропускной способности канала</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Input.cs</code></p>
+    <p>Сейчас движение мыши режется примерно до 16 ms и дополнительно suppress'ится по одинаковым координатам.</p>
+    <p><strong>Это неплохо</strong>, но логика фиксированная и не зависит от состояния data channel / latency / congestion. На плохих сетях input path может всё равно быть шумным.</p>
+  </div>
+
+  <div class="card low">
+    <h2>4. Host-side mouse injection очень прямолинейная</h2>
+    <p><strong>Файл:</strong> <code>WindowsInputInjectionService.cs</code></p>
+    <p>Для move/down/up/click/wheel используется просто:</p>
+    <ul>
+      <li><code>SetCursorPos(x, y)</code></li>
+      <li>далее mouse event.</li>
+    </ul>
+    <p>Для desktop remote control это норм. Но если потом захотеть более тонкий relative/raw mode, текущая модель будет ограничением. Сейчас это не баг, а просто граница подхода.</p>
+  </div>
+
+  <div class="card med">
+    <h2>5. Clipboard sync построен на polling и может быть шумным/хрупким</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Clipboard.cs</code></p>
+    <p>Сейчас буфер обмена проверяется циклом:</p>
+    <ul>
+      <li>читать Clipboard</li>
+      <li>сравнивать с последним наблюдённым</li>
+      <li>при изменении — отправлять</li>
+    </ul>
+    <p><strong>Минусы:</strong></p>
+    <ul>
+      <li>polling по своей природе шумнее event-driven подхода;</li>
+      <li>Clipboard API в Windows капризный, и код местами просто глотает ошибки;</li>
+      <li>возможны race/состояния “не успел увидеть” при частых изменениях.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>6. Clipboard echo suppression есть, но она довольно эвристическая</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Clipboard.cs</code></p>
+    <p>Сейчас защита от циклической пересылки держится на:</p>
+    <ul>
+      <li><code>_lastAppliedRemoteClipboardText</code></li>
+      <li>временном окне 1500 ms</li>
+      <li><code>_lastSentClipboardText</code></li>
+    </ul>
+    <p><strong>Это practical workaround</strong>, но не строгая модель синхронизации. В edge-cases возможны ложные suppress / ложные resend.</p>
+    <p><strong>Лучше:</strong> добавить явный clipboard message ID / version stamp, а не полагаться только на текст + таймер.</p>
+  </div>
+
+  <div class="card high">
+    <h2>7. Получение clipboard полностью доверяет входящему тексту до лимита размера</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Clipboard.cs</code></p>
+    <p>Есть ограничение <code>ClipboardMaxBytes</code> — это хорошо. Но логика всё равно довольно простая: если текст не слишком большой, он просто ставится в локальный буфер обмена.</p>
+    <p><strong>Риск:</strong> remote peer может шуметь clipboard updates и вмешиваться в локальную среду пользователя сильнее, чем ожидается.</p>
+    <p><strong>Это не security-catastrophe</strong>, но для polished UX стоит подумать о более явной политике sync-mode.</p>
+  </div>
+
+  <div class="card med">
+    <h2>8. Нет явного transport-level ordering/sequence для input событий</h2>
+    <p><strong>Файлы:</strong> payload model + datachannel usage</p>
+    <p>Судя по коду, input-события отправляются как обычные сообщения без отдельной sequence-модели на уровне приложения.</p>
+    <p>Если underlying channel гарантированно ordered/reliable — ок. Но приложение само этого явно не документирует и не контролирует.</p>
+    <p><strong>Для критичных input-path сценариев это стоит хотя бы задокументировать.</strong></p>
+  </div>
+
+  <div class="card low">
+    <h2>9. Ctrl+Alt+Del сделан отдельным командным путём — это правильно</h2>
+    <p><strong>Файл:</strong> <code>WindowsInputInjectionService.cs</code></p>
+    <p>Хорошо, что это не имитируется обычными keyboard payload'ами, а вынесено отдельно через <code>SendSAS</code>. Это более честный и понятный путь для secure attention sequence.</p>
+  </div>
+
+  <div class="card med">
+    <h2>10. Много мест просто глотают ошибки</h2>
+    <p><strong>Файлы:</strong> input + clipboard loops</p>
+    <p>Во многих местах:</p>
+    <ul>
+      <li><code>catch { }</code></li>
+      <li>или только тихий debug-log</li>
+    </ul>
+    <p>Для MVP это удобно, чтобы не падать. Но когда начнутся реальные user-баги типа:</p>
+    <ul>
+      <li>«иногда не отправляется Shift»</li>
+      <li>«иногда клипборд не доезжает»</li>
+      <li>«после reconnect залипают клавиши»</li>
+    </ul>
+    <p>— отлаживать будет трудно.</p>
+  </div>
+
+  <div class="card">
+    <h2>Топ-5 практических исправлений</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что сделать</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Унифицировать модель modifiers для клавиатуры</td><td>Это главный риск некорректного input поведения</td></tr>
+      <tr><td>2</td><td>Сделать более явный input transport status / diagnostics</td><td>Чтобы понимать, когда input path уже деградировал</td></tr>
+      <tr><td>3</td><td>Добавить clipboard message version/id вместо чистой эвристики по тексту</td><td>Снизит риск loopback и ложных suppress</td></tr>
+      <tr><td>4</td><td>Улучшить telemetry/logging по input failures</td><td>Иначе реальные баги будет сложно ловить</td></tr>
+      <tr><td>5</td><td>Подумать над adaptive throttling/queueing для mouse move</td><td>Сделает input path устойчивее на плохих сетях</td></tr>
+    </table>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>Подсистема мыши/клавиатуры/clipboard у тебя уже <strong>неплохая и вполне живая</strong>. Основные проблемы тут — не в полном отсутствии логики, а в том, что часть решений пока эвристические и слишком tolerant к ошибкам. Самое важное место для улучшения — <strong>модель модификаторов клавиатуры и более строгая диагностика input/clipboard path</strong>.</p>
+  </div>
+</body>
+</html>

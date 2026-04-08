@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Host Architecture Review — romantic-noyce</title>
+  <style>
+    body{font-family:Inter,Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:1100px;padding:0 20px;color:#e8eef6;background:#0b1220}
+    h1,h2,h3{line-height:1.2;color:#fff}
+    .card{background:#121b2d;border:1px solid #24324d;border-radius:16px;padding:20px;margin:18px 0}
+    .high{border-left:6px solid #ef4444}.med{border-left:6px solid #f59e0b}.low{border-left:6px solid #38bdf8}.good{border-left:6px solid #22c55e}
+    code,pre{background:#0a1020;color:#cde3ff;border-radius:8px} code{padding:2px 6px} pre{padding:14px;overflow:auto}
+    ul{padding-left:22px}.muted{color:#9fb0c8} table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #24324d;padding:10px;text-align:left;vertical-align:top} th{background:#10182a}
+  </style>
+</head>
+<body>
+  <h1>Host Architecture Review — romantic-noyce / ZConect</h1>
+  <p class="muted">Отдельный отчёт по host-сценарию: создание сессии, ожидание viewer, reconnect/reset, server API и host-side transport lifecycle.</p>
+
+  <div class="card good">
+    <h2>Короткий вывод</h2>
+    <p>Host-сторона у тебя уже продумана лучше, чем у типичного MVP: есть session create/refresh, повторное принятие viewer без полного закрытия сессии, WS reconnect, re-announce host state, lazy start локального видео только при offer с <code>m=video</code>.</p>
+    <p>Но именно host-режим сейчас содержит несколько <strong>наиболее хрупких архитектурных мест</strong>: доверие к server API, сложный reset/reconnect lifecycle и не до конца формализованная модель состояний.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что анализировалось</h2>
+    <ul>
+      <li><code>client/UiApp/ViewModels/MainViewModel.Connection.cs</code></li>
+      <li><code>client/SessionClient/SessionApiClient.cs</code></li>
+      <li><code>server/internal/session/service.go</code></li>
+      <li><code>server/internal/api/handler.go</code></li>
+      <li>связанные host-side куски transport/datachannel lifecycle</li>
+    </ul>
+  </div>
+
+  <div class="card good">
+    <h2>Что в host-архитектуре уже хорошо</h2>
+    <ul>
+      <li><strong>Host не стартует локальное видео раньше времени.</strong> Видео поднимается только если во входящем offer есть <code>m=video</code>.</li>
+      <li><strong>После disconnect viewer host не закрывает сессию целиком, а пытается переинициализировать peer runtime.</strong></li>
+      <li><strong>Есть WS reconnect path для host'а отдельно от viewer'а.</strong></li>
+      <li><strong>Есть persisted session info</strong> для переиспользования после рестарта приложения.</li>
+      <li><strong>Есть session refresh</strong> и обновление pass code без полной пересоздания сессии.</li>
+    </ul>
+  </div>
+
+  <div class="card high">
+    <h2>1. Самая опасная проблема: server API доверяет одному session_id</h2>
+    <p><strong>Файлы:</strong> <code>SessionApiClient.cs</code>, <code>server/internal/api/handler.go</code>, <code>server/internal/session/service.go</code></p>
+    <p>Host вызывает:</p>
+    <ul>
+      <li><code>CloseSessionAsync(baseUrl, sessionId)</code></li>
+      <li><code>RefreshSessionAsync(baseUrl, sessionId)</code></li>
+    </ul>
+    <p>На сервере эти endpoints тоже работают только по <code>session_id</code>.</p>
+    <p><strong>Проблема:</strong> если кто-то знает session ID, этого уже достаточно, чтобы:</p>
+    <ul>
+      <li>закрыть host-сессию;</li>
+      <li>обновить пароль;</li>
+      <li>получить новый ws_token через refresh-path.</li>
+    </ul>
+    <p><strong>Вывод:</strong> с точки зрения host-режима это одна из главных архитектурных дыр.</p>
+    <p><strong>Что нужно:</strong> owner token / host token / session secret, который не равен knowledge of session_id.</p>
+  </div>
+
+  <div class="card med">
+    <h2>2. CreateSessionAsync сохраняет данные сессии даже если host connect/runtime поднялся неудачно</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Connection.cs</code></p>
+    <p>Сценарий сейчас такой:</p>
+    <ol>
+      <li>CreateSession API вернул response</li>
+      <li>клиент делает <code>ConnectWsAsync(...)</code></li>
+      <li>после этого session info сохраняется в settings</li>
+    </ol>
+    <p>Но в <code>ConnectWsAsync</code> при ошибке WS-подключения метод просто ставит статус ошибки и <strong>не кидает exception наверх</strong>.</p>
+    <p><strong>Следствие:</strong> хост может сохранить в настройки session credentials, хотя runtime реально не поднялся корректно.</p>
+    <p><strong>Лучше:</strong> возвращать из <code>ConnectWsAsync</code> явный результат успех/неуспех и сохранять persisted session только после успешного runtime bring-up.</p>
+  </div>
+
+  <div class="card med">
+    <h2>3. Host reset path очень сложный и хрупкий</h2>
+    <p><strong>Файл:</strong> <code>MainViewModel.Connection.cs</code> — <code>ResetForNewViewerAsync()</code></p>
+    <p>После disconnect viewer host делает не full teardown, а:</p>
+    <ul>
+      <li>останавливает фоновые задачи;</li>
+      <li>disposes old WebRTC/runtime;</li>
+      <li>обнуляет много state flags вручную;</li>
+      <li>создаёт новый peer/data agent;</li>
+      <li>пересоздаёт signaling coordinator;</li>
+      <li>re-announces host state.</li>
+    </ul>
+    <p><strong>Это рабочая идея</strong>, но место очень хрупкое: здесь легко поймать двойные подписки, забытые state-флаги и несогласованность между old/new peer runtime.</p>
+  </div>
+
+  <div class="card med">
+    <h2>4. Host и viewer используют разные reconnect semantics, но это не оформлено как state machine</h2>
+    <p>Сейчас логика разумна:</p>
+    <ul>
+      <li>viewer — full reconnect;</li>
+      <li>host — WS-only reconnect;</li>
+      <li>viewer disconnect — host reset for new viewer.</li>
+    </ul>
+    <p>Но всё это живёт как набор методов и флагов, а не как явная state machine.</p>
+    <p><strong>Риск:</strong> сложные edge-case баги вида:</p>
+    <ul>
+      <li>peer disconnected пришёл во время reconnect;</li>
+      <li>refresh session прошёл, а ws reconnect не успел;</li>
+      <li>host reset и ws reconnect пересеклись по времени.</li>
+    </ul>
+  </div>
+
+  <div class="card med">
+    <h2>5. WS reconnect у host'а завязан на refresh endpoint, а refresh сам по себе недостаточно защищён</h2>
+    <p><strong>Файлы:</strong> <code>WsReconnectLoopAsync()</code>, <code>handler.go</code></p>
+    <p>При host reconnect клиент получает fresh WS token через <code>refresh</code>. Это удобно, но усиливает проблему доверия к refresh API: если refresh слабо защищён, то он становится ключевым security gateway для host runtime.</p>
+  </div>
+
+  <div class="card med">
+    <h2>6. В host path есть сильная зависимость от peer_state-сообщений как surrogate state model</h2>
+    <p>Host при получении <code>peer_state</code>:</p>
+    <ul>
+      <li>обновляет UI как «viewer connected»;</li>
+      <li>ре-анонсит <code>host_ready</code>.</li>
+    </ul>
+    <p>Это работает, но <code>peer_state</code> сейчас слишком много значит:</p>
+    <ul>
+      <li>presence signal,</li>
+      <li>readiness signal,</li>
+      <li>косвенный trigger orchestration.</li>
+    </ul>
+    <p><strong>Лучше:</strong> более явная signaling state model: <code>joined</code>, <code>ready</code>, <code>paired</code>, <code>runtime_reset</code> и т.п.</p>
+  </div>
+
+  <div class="card med">
+    <h2>7. Host-side file transfer/runtime и remote-control subscriptions пересоздаются вместе с transport runtime</h2>
+    <p>Это логично, но место очень чувствительное. При каждом reset создаются:</p>
+    <ul>
+      <li>новый DataChannelCoordinator;</li>
+      <li>новый FileTransferService;</li>
+      <li>новые event subscriptions;</li>
+      <li>новые pending request ids.</li>
+    </ul>
+    <p><strong>Риск:</strong> если где-то UI-слой или окно FT держит старую ссылку на сервис/runtime, возможны висячие состояния и несогласованность после viewer reconnect.</p>
+  </div>
+
+  <div class="card low">
+    <h2>8. Session service на сервере для host'а выглядит достаточно чисто</h2>
+    <p><strong>Плюсы:</strong></p>
+    <ul>
+      <li>reuse active session по <code>machine_id</code> — полезная идея;</li>
+      <li>refresh регенерирует только pass_code, login_code остаётся стабильным;</li>
+      <li>TTL хранится и переиспользуется;</li>
+      <li>есть lockout по join attempts.</li>
+    </ul>
+    <p>Для MVP это нормальная session model.</p>
+  </div>
+
+  <div class="card low">
+    <h2>9. Но при expire/close cleanup индексов местами недостаточно немедленный</h2>
+    <p>Это не host-only баг, но хост-сценарий его чувствует сильнее. Например expired session может быть помечена как closed, но не всегда сразу убрана из индексов до отдельных cleanup-путей.</p>
+  </div>
+
+  <div class="card high">
+    <h2>10. Host runtime сейчас слишком сильно завязан на MainViewModel</h2>
+    <p>В host-сценарии ViewModel уже выступает как:</p>
+    <ul>
+      <li>session controller;</li>
+      <li>signaling runtime manager;</li>
+      <li>WebRTC orchestrator;</li>
+      <li>file transfer bootstrapper;</li>
+      <li>UI state holder.</li>
+    </ul>
+    <p><strong>Это не просто MVVM anymore.</strong> Это означает, что дальнейшее усложнение host path почти гарантированно будет увеличивать хрупкость.</p>
+  </div>
+
+  <div class="card">
+    <h2>Что бы я исправлял первым именно для host-стороны</h2>
+    <table>
+      <tr><th>Приоритет</th><th>Что менять</th><th>Почему</th></tr>
+      <tr><td>1</td><td>Защитить refresh/close/create-owner flow отдельным host token</td><td>Это главный security риск host-архитектуры</td></tr>
+      <tr><td>2</td><td>Сделать <code>ConnectWsAsync</code> с явным success/failure result</td><td>Чтобы не сохранять живую сессию, если runtime не поднялся</td></tr>
+      <tr><td>3</td><td>Формализовать host runtime как state machine</td><td>Снизит хаос вокруг reconnect/reset</td></tr>
+      <tr><td>4</td><td>Разделить peer_state presence и readiness semantics</td><td>Сделает signaling lifecycle честнее</td></tr>
+      <tr><td>5</td><td>Выделить host runtime coordinator из MainViewModel</td><td>Упростит сопровождение и снизит количество тонких багов</td></tr>
+    </table>
+  </div>
+
+  <div class="card good">
+    <h2>Итог</h2>
+    <p>Host-архитектура у тебя уже <strong>неплохая и живая</strong>, но это один из самых сложных контуров проекта. Основные проблемы здесь — не в том, что «не работает», а в том, что <strong>слишком много критичного поведения держится на хрупкой orchestration-логике и слабой trust-модели server API</strong>. Именно host path я бы считал одной из главных зон инженерного долга на ближайшее время.</p>
+  </div>
+</body>
+</html>

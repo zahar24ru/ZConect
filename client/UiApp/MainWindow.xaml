@@ -5,20 +5,25 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="ZConnect"
-        Height="600"
+        Icon="app.ico"
+        SizeToContent="Height"
         Width="520"
         MinWidth="500"
-        MinHeight="520"
+        MinHeight="480"
+        MaxHeight="900"
         Background="#F3F7FC"
-        ResizeMode="CanResize">
-    <Grid Margin="14">
+        ResizeMode="CanResizeWithGrip">
+    <Grid>
+        <!-- Main content layer -->
+        <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Menu bar -->
         <Border Grid.Row="0"
                 CornerRadius="12"
                 Background="#FFFFFF"
@@ -27,14 +32,10 @@
                 Padding="4"
                 Margin="0,0,0,10">
             <Menu Background="Transparent">
-                <MenuItem Header="Настройки">
-                    <MenuItem Header="Система" Click="MenuSystem_Click"/>
+                <MenuItem Header="ZConnect">
+                    <MenuItem Header="Настройки" Click="MenuSystem_Click"/>
                     <Separator/>
                     <MenuItem Header="Выход" Click="MenuExit_Click"/>
-                </MenuItem>
-                <MenuItem Header="Инструменты">
-                    <MenuItem Header="Заглушка" Click="MenuToolsStub1_Click"/>
-                    <MenuItem Header="Заглушка" Click="MenuToolsStub2_Click"/>
                 </MenuItem>
                 <MenuItem Header="О программе">
                     <MenuItem Header="Справка" Click="MenuHelp_Click"/>
@@ -43,6 +44,7 @@
             </Menu>
         </Border>
 
+        <!-- Banner -->
         <Border Grid.Row="1"
                 CornerRadius="14"
                 BorderBrush="#D7E2EF"
@@ -55,21 +57,44 @@
                     <GradientStop Color="#EAF3FF" Offset="1"/>
                 </LinearGradientBrush>
             </Border.Background>
-            <TextBlock Text="ZConnect"
-                       FontSize="23"
-                       FontWeight="SemiBold"
-                       Foreground="#155FA2"/>
+            <DockPanel>
+                <TextBlock Text="ZConnect"
+                           FontSize="23"
+                           FontWeight="SemiBold"
+                           Foreground="#155FA2"
+                           DockPanel.Dock="Left"/>
+                <TextBlock Text="v1.0.0"
+                           FontSize="11"
+                           Foreground="#9CA3AF"
+                           VerticalAlignment="Bottom"
+                           Margin="0,0,0,3"
+                           DockPanel.Dock="Right"
+                           HorizontalAlignment="Right"/>
+            </DockPanel>
         </Border>
 
+        <!-- Tabs -->
         <Border Grid.Row="2"
                 CornerRadius="14"
                 Background="#FFFFFF"
                 BorderBrush="#D7E2EF"
                 BorderThickness="1"
                 Padding="14"
+                MinHeight="320"
                 Margin="0,0,0,10">
             <TabControl>
-                <TabItem Header="Создать сессию">
+
+                <!-- Создать сессию -->
+                <TabItem>
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="14" Height="14" Margin="0,0,5,0">
+                                <Path Data="M8,1 V7 H14 V9 H8 V15 H6 V9 H0 V7 H6 V1 Z"
+                                      Fill="{StaticResource PrimaryBrush}"/>
+                            </Viewbox>
+                            <TextBlock Text="Создать сессию" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -78,18 +103,19 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <Button Grid.Row="0"
-                                Height="36"
-                                Content="Создать сессию"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding CreateSessionCommand}"/>
+                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Логин"
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                            <TextBlock Grid.Column="2" Text="Пароль"
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                        </Grid>
 
-                        <TextBlock Grid.Row="1"
-                                   Margin="0,12,0,4"
-                                   Text="Логин / пароль для клиента (только копирование)"
-                                   Foreground="{StaticResource TextSecondaryBrush}"/>
-
-                        <Grid Grid.Row="2">
+                        <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="10"/>
@@ -98,27 +124,53 @@
                             <TextBox Grid.Column="0"
                                      Height="36"
                                      Style="{StaticResource ReadOnlyTextBoxStyle}"
-                                     Text="{Binding LoginCode}"/>
+                                     Text="{Binding LoginCode}"
+                                     Cursor="Hand"
+                                     ToolTip="Нажмите, чтобы скопировать логин и пароль"
+                                     PreviewMouseDown="SessionCode_PreviewMouseDown"/>
                             <TextBox Grid.Column="2"
                                      Height="36"
                                      Style="{StaticResource ReadOnlyTextBoxStyle}"
-                                     Text="{Binding PassCode}"/>
+                                     Text="{Binding PassCode}"
+                                     Cursor="Hand"
+                                     ToolTip="Нажмите, чтобы скопировать логин и пароль"
+                                     PreviewMouseDown="SessionCode_PreviewMouseDown"/>
                         </Grid>
 
-                        <Button Grid.Row="3"
-                                Margin="0,10,0,0"
-                                Height="36"
-                                Width="170"
-                                HorizontalAlignment="Left"
-                                Content="Скопировать оба"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding CopySessionCodesCommand}"/>
+                        <Grid Grid.Row="2" Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Height="36"
+                                    Content="Создать сессию"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding CreateSessionCommand}"/>
+                            <Button Grid.Column="2"
+                                    Height="36"
+                                    Content="Обновить пароль"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding RefreshSessionCommand}"/>
+                        </Grid>
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="Подключиться">
+                <!-- Подключиться -->
+                <TabItem>
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="14" Height="14" Margin="0,0,5,0">
+                                <Path Data="M1,2 C0.4,2 0,2.5 0,3 V11 C0,11.5 0.4,12 1,12 H6 V14 H10 V12 H15 C15.6,12 16,11.5 16,11 V3 C16,2.5 15.6,2 15,2 Z M1.5,3.5 H14.5 V10.5 H1.5 Z"
+                                      Fill="{StaticResource PrimaryBrush}"/>
+                            </Viewbox>
+                            <TextBlock Text="Подключиться" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -171,14 +223,33 @@
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Command="{Binding JoinSessionCommand}"/>
 
-                        <Button Grid.Row="3"
-                                Height="36"
-                                Margin="0,10,0,0"
-                                Content="Отправить файл"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding SendFileCommand}"/>
+                        <Grid Grid.Row="3" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Height="34"
+                                    Content="Передача файлов"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding SendFileCommand}"/>
+                            <Button Grid.Column="2"
+                                    Height="34"
+                                    Content="Удалённый стол"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding OpenRemoteDesktopCommand}"
+                                    Visibility="{Binding RemoteDesktopButtonVisibility}"/>
+                        </Grid>
 
-                        <Border Grid.Row="4"
+                        <CheckBox Grid.Row="4"
+                                  Margin="0,8,0,0"
+                                  Content="Только передача файлов (без видео)"
+                                  IsChecked="{Binding FileTransferOnly}"
+                                  Foreground="{StaticResource TextSecondaryBrush}"
+                                  FontSize="12"/>
+
+                        <Border Grid.Row="5"
                                 Margin="0,8,0,0"
                                 CornerRadius="8"
                                 Background="#F6FAFF"
@@ -187,13 +258,202 @@
                                 Padding="8">
                             <TextBlock Text="{Binding FileTransferProgressText}"
                                        Foreground="#42586E"
-                                       TextWrapping="Wrap"/>
+                                       TextWrapping="Wrap"
+                                       FontSize="12"/>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- Адресная книга -->
+                <TabItem>
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="14" Height="14" Margin="0,0,5,0">
+                                <Path Data="M5.5,1 C3.6,1 2,2.6 2,4.5 C2,6.4 3.6,8 5.5,8 C7.4,8 9,6.4 9,4.5 C9,2.6 7.4,1 5.5,1 Z M0,15 C0,12 2.5,10 5.5,10 C8.5,10 11,12 11,15 Z M12,4.5 C12,3 13,1.5 14.5,1.5 C16,1.5 17,3 17,4.5 C17,6 16,7.5 14.5,7.5 C13,7.5 12,6 12,4.5 Z M12,10 C12,10 13,9.5 14.5,9.5 C16.5,9.5 18,11 18,13.5 H12"
+                                      Fill="{StaticResource PrimaryBrush}"/>
+                            </Viewbox>
+                            <TextBlock Text="Адресная книга" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Контакты"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+
+                            <Grid>
+                                <ListBox x:Name="ContactsListBox"
+                                         ItemsSource="{Binding Contacts}"
+                                         SelectedItem="{Binding SelectedContact}"
+                                         Height="140"
+                                         Margin="0,0,0,8"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Padding" Value="4,2"/>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Name}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <Button Grid.Column="1"
+                                                        Style="{StaticResource IconButtonStyle}"
+                                                        ToolTip="Изменить"
+                                                        Command="{Binding DataContext.EditContactCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                        CommandParameter="{Binding}">
+                                                    <TextBlock Text="&#xE104;" FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="12" Foreground="#155FA2"/>
+                                                </Button>
+                                                <Button Grid.Column="2"
+                                                        Style="{StaticResource IconButtonStyle}"
+                                                        ToolTip="Удалить"
+                                                        Command="{Binding DataContext.RemoveContactCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                        CommandParameter="{Binding}">
+                                                    <TextBlock Text="&#xE107;" FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="12" Foreground="#B03A2E"/>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- Empty state overlay -->
+                                <TextBlock Text="Нет сохранённых контактов"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="#9CA3AF"
+                                           FontSize="13"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Contacts.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+
+                            <Button Content="Подключиться"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ConnectToContactCommand}"
+                                    Height="32"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="2"
+                                CornerRadius="8"
+                                Background="#F6FAFF"
+                                BorderBrush="#DDE8F5"
+                                BorderThickness="1"
+                                Padding="10">
+                            <StackPanel>
+                                <TextBlock Text="{Binding ContactFormTitle}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="Имя"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="12"
+                                           Margin="0,0,0,2"/>
+                                <Grid Margin="0,0,0,6">
+                                    <TextBox Height="28"
+                                             Text="{Binding NewContactName, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Text="Рабочий ПК"
+                                               IsHitTestVisible="False"
+                                               VerticalAlignment="Center"
+                                               Margin="6,0,0,0"
+                                               Foreground="#9CA3AF"
+                                               FontSize="12"
+                                               Visibility="{Binding NewContactName, Converter={StaticResource EmptyToVisibilityConverter}}"/>
+                                </Grid>
+                                <TextBlock Text="Адрес сервера"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="12"
+                                           Margin="0,0,0,2"/>
+                                <Grid Margin="0,0,0,6">
+                                    <TextBox Height="28"
+                                             Text="{Binding NewContactServer, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Text="https://server:8080"
+                                               IsHitTestVisible="False"
+                                               VerticalAlignment="Center"
+                                               Margin="6,0,0,0"
+                                               Foreground="#9CA3AF"
+                                               FontSize="12"
+                                               Visibility="{Binding NewContactServer, Converter={StaticResource EmptyToVisibilityConverter}}"/>
+                                </Grid>
+                                <TextBlock Text="Логин и пароль (по 8 цифр)"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="12"
+                                           Margin="0,0,0,2"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <TextBox Height="28"
+                                                 Text="{Binding NewContactLogin, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBlock Text="12345678"
+                                                   IsHitTestVisible="False"
+                                                   VerticalAlignment="Center"
+                                                   Margin="6,0,0,0"
+                                                   Foreground="#9CA3AF"
+                                                   FontSize="12"
+                                                   Visibility="{Binding NewContactLogin, Converter={StaticResource EmptyToVisibilityConverter}}"/>
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <TextBox Height="28"
+                                                 Text="{Binding NewContactPass, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBlock Text="87654321"
+                                                   IsHitTestVisible="False"
+                                                   VerticalAlignment="Center"
+                                                   Margin="6,0,0,0"
+                                                   Foreground="#9CA3AF"
+                                                   FontSize="12"
+                                                   Visibility="{Binding NewContactPass, Converter={StaticResource EmptyToVisibilityConverter}}"/>
+                                    </Grid>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{Binding ContactFormButtonText}"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Command="{Binding AddContactCommand}"
+                                            Height="32"
+                                            Margin="0,0,8,0"/>
+                                    <Button Content="Отмена"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding CancelEditContactCommand}"
+                                            Height="32"
+                                            Visibility="{Binding IsEditingContact, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+                            </StackPanel>
                         </Border>
                     </Grid>
                 </TabItem>
             </TabControl>
         </Border>
 
+        <!-- Status bar -->
         <Border Grid.Row="3"
                 CornerRadius="14"
                 Background="#FFFFFF"
@@ -201,25 +461,136 @@
                 BorderThickness="1"
                 Padding="12">
             <StackPanel>
-                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextPrimaryBrush}"/>
-                <Expander Header="ICE debug" IsExpanded="False" Margin="0,6,0,0">
-                    <StackPanel Margin="0,6,0,0">
-                        <TextBlock Text="{Binding IcePathText}"
-                                   FontSize="11"
-                                   Foreground="{Binding IcePathBrush}"/>
-                        <TextBlock Text="Последние 5 кандидатов:"
-                                   Margin="0,8,0,0"
-                                   FontSize="10"
-                                   Foreground="#506377"/>
-                        <TextBlock Text="{Binding IceRecentCandidatesText}"
-                                   Margin="0,2,0,0"
-                                   FontSize="10"
-                                   FontFamily="Consolas"
-                                   Foreground="#506377"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Expander>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Grid.Column="0"
+                             Width="10" Height="10"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0"
+                             Fill="{Binding StatusDotBrush}">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{Binding StatusDotBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnecting}" Value="True">
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard Name="PulseStoryboard">
+                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1.0" To="0.15"
+                                                                     Duration="0:0:0.7"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="PulseStoryboard"/>
+                                        </DataTrigger.ExitActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Text="{Binding StatusText, Mode=OneWay}"/>
+                    <!-- Session countdown (prominent) -->
+                    <Border Grid.Column="2"
+                            CornerRadius="6"
+                            Background="#EAF3FF"
+                            Padding="8,3"
+                            VerticalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SessionCountdownText}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding SessionCountdownText, Mode=OneWay}"
+                                   Foreground="#155FA2"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   FontFamily="Consolas"/>
+                    </Border>
+                </Grid>
+                <TextBlock Text="{Binding ViewerConnectionStatus}"
+                           FontSize="12"
+                           Foreground="{Binding ViewerConnectionStatusBrush}"
+                           FontWeight="SemiBold"
+                           Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ViewerConnectionStatus}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding HostStatsText}"
+                           FontSize="11"
+                           FontFamily="Consolas"
+                           Foreground="#506377"
+                           Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HostStatsText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
+        </Border>
+        </Grid>
+
+        <!-- Toast overlay (centered, semi-transparent) -->
+        <Border x:Name="ToastOverlay"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                CornerRadius="10"
+                Padding="18,10"
+                IsHitTestVisible="False"
+                Opacity="0">
+            <Border.Background>
+                <SolidColorBrush Color="#1A1A2E" Opacity="0.82"/>
+            </Border.Background>
+            <TextBlock x:Name="ToastText"
+                       Text=""
+                       Foreground="White"
+                       FontSize="14"
+                       FontWeight="SemiBold"/>
+        </Border>
+
+        <!-- Viewer connected toast (top-right corner) -->
+        <Border x:Name="ViewerToast"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                CornerRadius="10"
+                Padding="14,10"
+                Margin="0,20,20,0"
+                IsHitTestVisible="False"
+                Opacity="0">
+            <Border.Background>
+                <SolidColorBrush Color="#155FA2" Opacity="0.92"/>
+            </Border.Background>
+            <TextBlock Text="К вам подключился зритель"
+                       Foreground="White"
+                       FontSize="13"
+                       FontWeight="SemiBold"/>
         </Border>
     </Grid>
 </Window>

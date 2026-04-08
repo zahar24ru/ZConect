@@ -9,8 +9,9 @@
 - STUN/TURN сервера (coturn) для прохождения NAT.
 - Хранилища краткоживущих сессий (Redis).
 
-Передача видео: VP8.  
-Транспорт: WebRTC (P2P при возможности, TURN relay при необходимости).  
+Передача видео: VP8/VP9 (WebRTC software encoding).
+Транспорт: WebRTC (P2P при возможности, TURN relay при необходимости).
+Захват экрана: DXGI Output Duplication (primary) + GDI (fallback).
 Сетевой стек MVP: IPv4.
 
 ## 2) Ключевые сценарии
@@ -65,11 +66,12 @@
 
 ### 3.1 Модель потоков
 
-- UI поток: только визуальная часть.
-- Capture/Encode поток: чтение кадров + encode VP8.
-- Network поток: signaling + WebRTC callbacks.
-- Input поток: события мыши/клавиатуры.
-- File transfer поток: отправка чанков файла.
+- **UI поток**: только визуальная часть (WPF Dispatcher).
+- **Capture поток**: выделенный `Thread` с high-precision loop (`Stopwatch` + `SpinWait`), DXGI/GDI захват + cursor compositing.
+- **Encode**: WebRTC внутренний поток (VP8/VP9 encoding из `ExternalVideoTrackSource` callback).
+- **Network поток**: signaling WebSocket + WebRTC callbacks.
+- **Input поток**: события мыши/клавиатуры (`SendInput`/`SetCursorPos`).
+- **File transfer поток**: отправка чанков файла по data channel.
 
 Взаимодействие модулей через четкие интерфейсы и события.
 
@@ -103,7 +105,7 @@
 - `dc-input` — события мыши/клавиатуры.
 - `dc-clipboard` — sync буфера обмена.
 - `dc-file` — обмен файлами.
-- `dc-control` — служебные команды (pause, quality-change, ping).
+- `dc-control` — служебные команды (quality-change, screen_meta, display switching, ping/pong RTT).
 
 Текущий дополнительный control-сценарий:
 
@@ -117,24 +119,97 @@
 
 ## 6) Видео и качество
 
-Профили:
+### 6.1 Профили качества
 
-- `LOW`: 15 fps (цель по битрейту/даунскейлу будет на следующем этапе)
-- `MEDIUM`: 30 fps (цель по битрейту/даунскейлу будет на следующем этапе)
-- `HIGH`: 30 fps (цель по битрейту/даунскейлу будет на следующем этапе)
+| Профиль | Разрешение | FPS | Битрейт |
+|---------|-----------|-----|---------|
+| Extra Low | 640×360 | 20 | 400 kbps |
+| Low | 854×480 | 20 | 900 kbps |
+| Medium | 1280×720 | 30 | 2200 kbps |
+| High | 1920×1080 | 30 | 4200 kbps |
+| Auto | = Medium (начальный) | адаптивный | адаптивный |
 
-Дополнительно:
+При выборе профиля нативное разрешение дисплея масштабируется вниз с сохранением пропорций.
+Bitrate hints передаются в WebRTC через `PeerConnection.SetBitrate(min=50%, start=100%, max=120%)`.
 
-- текущая реализация захвата для WebRTC: всегда полный размер выбранного дисплея (или bounding box всех дисплеев при `DisplayMode=All`); пресет качества влияет только на FPS.
-- `ffmpeg.exe` сейчас используется для проверки VP8 (`VP8 Probe`), а не как обязательная часть WebRTC передачи.
-- автоадаптация по packet loss/RTT.
-- ручное переключение профиля в UI.
-- выбор источника: один экран или все экраны.
-- путь к `ffmpeg.exe` задается в настройках клиента (`FfmpegPath`).
+### 6.2 Захват экрана
 
-## 7) Логи
+**DXGI Output Duplication API** — основной метод. Direct3D 11 GPU-захват без GDI. Для каждого монитора создаётся `IDXGIOutputDuplication`, кадр копируется в staging-текстуру и маппится для CPU-чтения.
 
-Все клиентские события пишутся в `logs.log`.  
+**DXGI Multi-Output Stitching** — при выборе "All" мониторов. Каждый выход (`IDXGIOutput`) захватывается независимо через собственный D3D11 device + OutputDuplication. Кадры сшиваются в единый буфер по desktop-координатам (`DxgiMultiOutputCapture`).
+
+**GDI CopyFromScreen** — fallback при недоступности DXGI (RDP-сессии, некоторые VM).
+
+### 6.3 Оптимизации захвата
+
+**Dirty rects** — DXGI возвращает список изменённых прямоугольников (`GetFrameDirtyRects`). Если dirty area < 50% экрана — копируются только изменённые регионы вместо полного кадра. Экономия CPU ~30–50% при типичной работе.
+
+**Double buffering** — два pinned-буфера (`GC.AllocateArray<byte>(pinned: true)`). Capture-поток пишет в back buffer, WebRTC-энкодер читает из front buffer через `GCHandle.AddrOfPinnedObject()`. Zero-copy к энкодеру.
+
+**Adaptive FPS** — при отсутствии изменений на экране (DXGI не отдал кадр / GDI pixel sampling) FPS снижается: base → base/2 → base/4. При появлении активности мгновенно возвращается к базовому.
+
+**High-precision capture loop** — выделенный поток `Thread` с `Stopwatch` + `SpinWait` (~1ms точность) вместо `System.Timers.Timer` (~15ms jitter). Приоритет `AboveNormal`.
+
+### 6.4 Курсор
+
+DXGI Output Duplication не захватывает курсор. Композитинг вручную:
+1. `GetCursorInfo` → получение позиции и handle курсора
+2. `DrawIconEx` → рендер в кэшированный bitmap 48×48 (пересоздаётся только при смене `hCursor`)
+3. Alpha-blending напрямую в capture-буфер (unsafe pointer arithmetic)
+
+### 6.5 Автоадаптация качества
+
+Фоновый цикл (1.5 сек) опрашивает `PeerConnection.GetSimpleStatsAsync()` — `VideoSenderStats` (BytesSent, FramesSent, FramesEncoded):
+- **Деградация**: >15% потерь кадров ИЛИ bitrate < 50% от целевого → 3 подряд плохих замера → понижение
+- **Улучшение**: <3% потерь И bitrate ≥ 85% → 8 подряд хороших замеров → повышение
+- Cooldown 5 замеров после каждого переключения
+- Лестница: Extra Low ↔ Low ↔ Medium ↔ High
+
+### 6.6 Viewer-side рендеринг
+
+`WriteableBitmap.Lock()` → `unsafe Buffer.MemoryCopy` → `AddDirtyRect` → `Unlock()`.
+Буферы кадров переиспользуются через `ConcurrentBag<byte[]>` pool (до 4 штук) — без аллокаций в горячем пути.
+
+### 6.7 Мониторинг
+
+- **Viewer overlay**: `1280×720  30 fps  2.1 Mbps  RTT: 25ms`
+- **Host stats**: `Захват: 30 fps  отправлено: 28  пропущено: 7%  RTT: 25ms`
+- **RTT**: ping/pong через Data Channel каждые 3 сек, экспоненциальное сглаживание (EMA 0.7/0.3)
+
+### 6.8 Выбор дисплея
+
+В UI единый список дисплеев: `DISPLAY1`, `DISPLAY2`, ..., `All`.
+- Конкретный дисплей → DXGI single output capture
+- All → DXGI multi-output stitching (GDI fallback)
+- Viewer может переключать дисплей host "на лету" через `dc-control`
+
+## 7) Структура клиентского кода
+
+`MainViewModel` разбит на partial-файлы:
+
+| Файл | Ответственность |
+|------|----------------|
+| `MainViewModel.cs` | поля, конструктор, свойства настроек, `SaveSettings`, `OnPropertyChanged` |
+| `MainViewModel.Connection.cs` | lifecycle сессии, `ConnectWsAsync`, авто-ICE, signaling-обработчики |
+| `MainViewModel.Ice.cs` | мониторинг ICE, `InferRouteType`, `IceTypeRank`, UI-индикация |
+| `MainViewModel.Video.cs` | захват/рендер видео, управление дисплеями, FFmpeg probe |
+| `MainViewModel.Clipboard.cs` | clipboard sync loop и приём |
+| `MainViewModel.FileTransfer.cs` | отправка/приём файлов, SHA-256, прогресс |
+| `MainViewModel.Input.cs` | ввод viewer-side, cursor sync, coordinate mapping |
+| `MainViewModel.Uac.cs` | политика UAC Secure Desktop |
+
+Команды (`RelayCommand`, `AsyncRelayCommand`) вынесены в `UiApp/Commands/RelayCommand.cs`.
+
+## 8) Известные ограничения сервера
+
+- **WebSocket keepalive**: ping отправляется каждые 30 сек, read deadline — 60 сек. Подходит для стабильных соединений.
+- **Concurrent writes**: защищены per-peer `writeMu` мьютексом (gorilla/websocket не потокобезопасен).
+- **In-memory sessions**: Redis сконфигурирован в `docker-compose.yml`, но не используется в коде; данные сбрасываются при рестарте сервера.
+- **ws_token**: stub `"todo-short-lived-token"`, аутентификация WS-подключения не реализована.
+
+## 10) Логи
+
+Все клиентские события пишутся в `logs.log`.
 Подробности формата: `docs/LOGGING.md`.
 
 ## 8) Ограничения MVP

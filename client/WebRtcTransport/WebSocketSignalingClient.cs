@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +18,9 @@ public sealed class WebSocketSignalingClient : IAsyncDisposable
     private CancellationTokenSource? _recvCts;
     private Task? _recvTask;
 
+    /// <summary>RTT of the WS TCP handshake in milliseconds. -1 if not measured.</summary>
+    public long HandshakeRttMs { get; private set; } = -1;
+
     public WebSocketSignalingClient()
     {
         // Keep WS alive while "host" is waiting for a viewer.
@@ -27,7 +31,10 @@ public sealed class WebSocketSignalingClient : IAsyncDisposable
     public async Task ConnectAsync(string wsUrl, string sessionId, string token, CancellationToken ct = default)
     {
         var uri = BuildUri(wsUrl, sessionId, token);
+        var sw = Stopwatch.StartNew();
         await _socket.ConnectAsync(uri, ct);
+        sw.Stop();
+        HandshakeRttMs = sw.ElapsedMilliseconds;
         _recvCts?.Cancel();
         _recvCts?.Dispose();
         _recvCts = new CancellationTokenSource();
@@ -36,6 +43,9 @@ public sealed class WebSocketSignalingClient : IAsyncDisposable
 
     public async Task SendAsync(string type, string sessionId, object payload, CancellationToken ct = default)
     {
+        if (_socket.State != WebSocketState.Open)
+            return;
+
         var envelope = new
         {
             type,
@@ -44,7 +54,19 @@ public sealed class WebSocketSignalingClient : IAsyncDisposable
         };
         var raw = JsonSerializer.Serialize(envelope, _jsonOptions);
         var bytes = Encoding.UTF8.GetBytes(raw);
-        await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+
+        try
+        {
+            await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+        }
+        catch (WebSocketException)
+        {
+            // WebSocket was aborted (e.g. VPN dropped) — suppress, Disconnected event will fire from receive loop
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed during shutdown
+        }
     }
 
     private async Task ReceiveLoopAsync(CancellationToken ct)
@@ -105,24 +127,26 @@ public sealed class WebSocketSignalingClient : IAsyncDisposable
         {
             try
             {
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "shutdown", CancellationToken.None);
+                using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "shutdown", closeCts.Token);
             }
             catch
             {
-                // ignore
+                // ignore — timeout or already closed
             }
         }
         if (_recvTask is not null)
         {
             try
             {
-                await _recvTask;
+                await Task.WhenAny(_recvTask, Task.Delay(2000));
             }
             catch
             {
                 // ignore
             }
         }
+        try { _socket.Abort(); } catch { }
         _recvCts?.Dispose();
         _socket.Dispose();
     }

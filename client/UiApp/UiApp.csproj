@@ -7,8 +7,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AssemblyName>ZConnect</AssemblyName>
+    <Product>ZConnect</Product>
+    <AssemblyTitle>ZConnect</AssemblyTitle>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileTransfer\FileTransfer.csproj" />
     <ProjectReference Include="..\QualityController\QualityController.csproj" />
     <ProjectReference Include="..\ScreenCapture\ScreenCapture.csproj" />
     <ProjectReference Include="..\SessionClient\SessionClient.csproj" />

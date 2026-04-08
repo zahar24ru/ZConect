@@ -10,6 +10,15 @@ public sealed class CreateSessionResponse
     public string WsToken { get; set; } = string.Empty;
 }
 
+public sealed class RefreshSessionResponse
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string LoginCode { get; set; } = string.Empty;
+    public string PassCode { get; set; } = string.Empty;
+    public int ExpiresInSec { get; set; }
+    public string WsToken { get; set; } = string.Empty;
+}
+
 public sealed class JoinSessionResponse
 {
     public string SessionId { get; set; } = string.Empty;

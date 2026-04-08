@@ -18,6 +18,9 @@ public sealed class LogService
     private readonly object _filterSync = new();
     private DebugLogFilterOptions _debugFilter = new();
 
+    private const long MaxLogSizeBytes = 5 * 1024 * 1024; // 5 MB
+    private const int MaxBackupFiles = 3;
+
     public LogService()
     {
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -67,6 +70,7 @@ public sealed class LogService
         var line = JsonSerializer.Serialize(payload);
         lock (_sync)
         {
+            RotateIfNeeded();
             File.AppendAllText(_path, line + Environment.NewLine);
         }
     }
@@ -109,6 +113,31 @@ public sealed class LogService
 
         // Any other debug modules are left untouched.
         return true;
+    }
+
+    private void RotateIfNeeded()
+    {
+        try
+        {
+            var fi = new FileInfo(_path);
+            if (!fi.Exists || fi.Length < MaxLogSizeBytes) return;
+
+            // Shift backup files: logs.3.log → delete, logs.2.log → logs.3.log, etc.
+            for (int i = MaxBackupFiles; i >= 1; i--)
+            {
+                var src = Path.Combine(fi.DirectoryName!, $"logs.{i}.log");
+                var dst = Path.Combine(fi.DirectoryName!, $"logs.{i + 1}.log");
+                if (i == MaxBackupFiles && File.Exists(src))
+                    File.Delete(src);
+                else if (File.Exists(src))
+                    File.Move(src, dst, overwrite: true);
+            }
+            File.Move(_path, Path.Combine(fi.DirectoryName!, "logs.1.log"), overwrite: true);
+        }
+        catch
+        {
+            // Rotation failure should not block logging.
+        }
     }
 
     private DebugLogFilterOptions ReadFilterSnapshot()

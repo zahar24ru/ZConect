@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZConect File Transfer — лучшие идеи</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a30;
+      --muted: #a9b5d1;
+      --text: #eaf0ff;
+      --accent: #6ea8fe;
+      --ok: #5dd39e;
+      --warn: #ffcf70;
+      --line: #243152;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0c1328 100%);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 48px; }
+    h1 { margin: 0 0 8px; font-size: 34px; }
+    .sub { color: var(--muted); margin-bottom: 24px; }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .panel {
+      background: rgba(18, 26, 48, .9);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .panel h2 { margin: 0 0 10px; font-size: 20px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid #34466f;
+      color: #d8e3ff;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      background: #152244;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .app {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .app .top { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+    .app img { width: 36px; height: 36px; object-fit: contain; background: #fff; border-radius: 8px; padding: 3px; }
+    .app h3 { margin: 0; font-size: 16px; }
+    .app .type { color: var(--muted); font-size: 12px; }
+    .app ul { margin: 10px 0 12px; padding: 0 18px 0 30px; }
+    .app li { margin: 6px 0; color: #d9e4ff; }
+    .take {
+      margin-top: auto;
+      border-top: 1px dashed #33466f;
+      padding: 10px 12px 12px;
+      background: #101a34;
+      color: #cce1ff;
+      font-size: 14px;
+    }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; background: #10172f; min-width: 760px; }
+    th, td { padding: 10px; border-bottom: 1px solid #233153; border-right: 1px solid #233153; text-align: left; }
+    th { background: #152244; font-size: 14px; }
+    td { font-size: 14px; }
+    .yes { color: var(--ok); font-weight: 600; }
+    .mid { color: var(--warn); font-weight: 600; }
+    .no { color: #f08b8b; font-weight: 600; }
+    .roadmap { margin-top: 18px; }
+    .step { margin-bottom: 10px; padding: 12px; border: 1px solid var(--line); background: #111a33; border-radius: 10px; }
+    .step b { color: #d6e8ff; }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>ZConect File Transfer: что взять у лучших</h1>
+    <div class="sub">Подборка удобных программ (в духе Total Commander / FileZilla) и готовый список фич для модуля передачи файлов в <b>ZConect</b>.</div>
+
+    <div class="hero">
+      <div class="panel">
+        <h2>Что важно для «идеального» File Transfer</h2>
+        <div class="chips">
+          <span class="chip">Drag & Drop</span>
+          <span class="chip">Очередь задач</span>
+          <span class="chip">Пауза/докачка</span>
+          <span class="chip">Проверка хэша</span>
+          <span class="chip">Дельта-копирование</span>
+          <span class="chip">Ограничение скорости</span>
+          <span class="chip">Фоновые операции</span>
+          <span class="chip">Шифрование E2E</span>
+          <span class="chip">Логи + retries</span>
+          <span class="chip">2-панельный UI</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Цель для ZConect</h2>
+        <p style="margin:0;color:#dbe7ff">Сделать модуль, который ощущается как <b>Total Commander</b> по удобству, как <b>FileZilla/WinSCP</b> по стабильности и как <b>TeraCopy/FastCopy</b> по скорости и контролю ошибок.</p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/en/5/54/Total_Commander_11_icon.png" alt="Total Commander" />
+          <div>
+            <h3>Total Commander</h3>
+            <div class="type">Двухпанельный файловый менеджер</div>
+          </div>
+        </div>
+        <ul>
+          <li>Супер-быстрая навигация (две панели + горячие клавиши)</li>
+          <li>Пакетные операции, синхронизация каталогов</li>
+          <li>Удобная работа с архивами как с папками</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> 2-панельный режим, «F5/F6»-логика копирования/перемещения, быстрый фильтр и массовые операции.</div>
+      </article>
+
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/FileZilla_logo.svg" alt="FileZilla" />
+          <div>
+            <h3>FileZilla</h3>
+            <div class="type">FTP/SFTP клиент</div>
+          </div>
+        </div>
+        <ul>
+          <li>Очередь передач с приоритетами</li>
+          <li>Надёжный retry и докачка</li>
+          <li>Отдельные вкладки для локальной/удалённой FS</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> мощная очередь, статусы по каждому файлу, автоповторы и «resume after reconnect».</div>
+      </article>
+
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/WinSCP_Logo.svg" alt="WinSCP" />
+          <div>
+            <h3>WinSCP</h3>
+            <div class="type">SFTP/SCP/FTP клиент</div>
+          </div>
+        </div>
+        <ul>
+          <li>Сильная безопасность + проверка ключей</li>
+          <li>Скрипты/автоматизация задач</li>
+          <li>Синхронизация папок с правилами</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> профиль подключения, fingerprint trust, синхронизация и CLI-режим для авто-задач.</div>
+      </article>
+
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/9/9b/TeraCopy_logo.svg" alt="TeraCopy" />
+          <div>
+            <h3>TeraCopy</h3>
+            <div class="type">Копирование в Windows</div>
+          </div>
+        </div>
+        <ul>
+          <li>Пауза/продолжить копирование</li>
+          <li>Контроль конфликтов и пропуск ошибок</li>
+          <li>Проверка целостности (hash)</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> «умный» conflict resolver, верификация после передачи, понятные отчёты об ошибках.</div>
+      </article>
+
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/8/8b/FastCopy_logo.png" alt="FastCopy" />
+          <div>
+            <h3>FastCopy</h3>
+            <div class="type">Высокоскоростное копирование</div>
+          </div>
+        </div>
+        <ul>
+          <li>Максимум скорости на больших объёмах</li>
+          <li>Тонкая настройка буферов/потоков</li>
+          <li>Надёжный лог и проверка</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> режимы speed/reliability, профили оптимизации под LAN/Internet.</div>
+      </article>
+
+      <article class="app">
+        <div class="top">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/f/f7/Syncthing_logo.svg" alt="Syncthing" />
+          <div>
+            <h3>Syncthing</h3>
+            <div class="type">P2P синхронизация</div>
+          </div>
+        </div>
+        <ul>
+          <li>End-to-end шифрование и P2P</li>
+          <li>Версионирование и watch папок</li>
+          <li>Устойчивость к обрывам сети</li>
+        </ul>
+        <div class="take"><b>Взять в ZConect:</b> «папка под наблюдением», дельта-синк и безопасный P2P-канал.</div>
+      </article>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Фича</th>
+            <th>Total Commander</th>
+            <th>FileZilla</th>
+            <th>WinSCP</th>
+            <th>TeraCopy</th>
+            <th>Syncthing</th>
+            <th>Что делать в ZConect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Двухпанельный UI</td><td class="yes">Да</td><td class="mid">Частично</td><td class="yes">Да</td><td class="no">Нет</td><td class="no">Нет</td><td>Сделать как режим «Pro»</td></tr>
+          <tr><td>Очередь задач</td><td class="mid">Базово</td><td class="yes">Сильная</td><td class="yes">Сильная</td><td class="yes">Да</td><td class="mid">Авто</td><td>Приоритеты + пауза + retry</td></tr>
+          <tr><td>Докачка / resume</td><td class="mid">Частично</td><td class="yes">Да</td><td class="yes">Да</td><td class="yes">Да</td><td class="yes">Да</td><td>Обязательно</td></tr>
+          <tr><td>Проверка хэшей</td><td class="mid">Плагины</td><td class="mid">Ограниченно</td><td class="mid">Скрипты</td><td class="yes">Да</td><td class="yes">Да</td><td>SHA-256 verify после передачи</td></tr>
+          <tr><td>Синхронизация папок</td><td class="yes">Да</td><td class="mid">Ограниченно</td><td class="yes">Да</td><td class="no">Нет</td><td class="yes">Да</td><td>Smart sync + dry-run</td></tr>
+          <tr><td>P2P + E2E</td><td class="no">Нет</td><td class="no">Нет</td><td class="mid">Через SFTP</td><td class="no">Нет</td><td class="yes">Да</td><td>Встроить безопасный P2P канал</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section class="roadmap">
+      <h2>Рекомендуемый roadmap для дополнения ZConect File Transfer</h2>
+      <div class="step"><b>v0.1 MVP:</b> загрузка/скачивание файлов, очередь, пауза/resume, drag&drop, прогресс по каждому файлу.</div>
+      <div class="step"><b>v0.2 Stability:</b> автоповторы, контроль таймаутов, верификация SHA-256, нормальный журнал ошибок.</div>
+      <div class="step"><b>v0.3 Pro UX:</b> двухпанельный режим, массовые операции, фильтры, шаблоны путей, горячие клавиши.</div>
+      <div class="step"><b>v0.4 Smart Sync:</b> синхронизация папок, сравнение по хэшу/mtime, dry-run перед применением.</div>
+      <div class="step"><b>v0.5 Secure P2P:</b> end-to-end, NAT traversal, fallback relay, шифрованные профили подключения.</div>
+    </section>
+
+    <div class="footer">
+      Подготовлено как аналитическая страница для проектирования модуля File Transfer в ZConect.
+    </div>
+  </div>
+</body>
+</html>

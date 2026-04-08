@@ -121,17 +121,50 @@
   - host отправляет `cursor_shape` в `dc-control` при изменении курсора
   - viewer применяет соответствующий локальный курсор (`arrow/ibeam/hand/resize/wait/...`)
 
+## Оптимизация передачи изображения (выполнено)
+
+- **DXGI Output Duplication** — основной метод захвата экрана через GPU (Direct3D 11). GDI CopyFromScreen как fallback.
+- **DXGI Multi-Output Stitching** — при выборе "All" мониторов каждый выход захватывается независимо (собственный D3D11 device + OutputDuplication), кадры сшиваются по desktop-координатам.
+- **Dirty rects** — `GetFrameDirtyRects` из DXGI: при типичной работе копируются только изменённые регионы (~30–50% экономии CPU).
+- **Double buffering** — два pinned-буфера (`GC.AllocateArray<byte>(pinned: true)`), zero-copy к WebRTC энкодеру через `GCHandle.AddrOfPinnedObject()`.
+- **High-precision capture loop** — выделенный `Thread` + `Stopwatch` + `SpinWait` (~1ms точность) вместо `System.Timers.Timer` (~15ms jitter).
+- **Adaptive FPS** — автоснижение FPS при неизменном экране (base → base/2 → base/4), мгновенный возврат при активности.
+- **Cursor shape caching** — рендер курсора через `DrawIconEx` в кэшированный bitmap 48×48, пересоздание только при смене `hCursor`. Alpha-blending напрямую в capture-буфер.
+- **Auto-quality** — фоновый цикл (1.5 сек) анализирует `VideoSenderStats`, лестница переключений Extra Low ↔ Low ↔ Medium ↔ High с cooldown.
+- **Bitrate hints** — `PeerConnection.SetBitrate(min=50%, start=100%, max=120%)` для каждого профиля.
+- **Viewer buffer pool** — `ConcurrentBag<byte[]>` (до 4 буферов), без аллокаций в горячем пути рендеринга.
+- **Viewer rendering** — `WriteableBitmap.Lock()` + `unsafe Buffer.MemoryCopy` + `AddDirtyRect` + `Unlock()`.
+- **RTT overlay** — ping/pong через Data Channel (3 сек), EMA сглаживание, отображение в stats overlay на viewer и host.
+- **Профили качества**: Extra Low (640×360/20fps/400kbps), Low (854×480/20fps/900kbps), Medium (1280×720/30fps/2200kbps), High (1920×1080/30fps/4200kbps), Auto.
+- **Упрощённый выбор дисплея**: убраны режимы Current/Any/All, единый список `DISPLAY1, DISPLAY2, ..., All`.
+- **Исправлен маппинг координат курсора**: ScreenMetaPayload теперь отправляет нативные размеры дисплея, корректная работа при любом качестве.
+- **Исправлено переключение мониторов**: EnsureCaptureResources отслеживает изменение capture-региона, не только размер буфера.
+
+## Рефакторинг (выполнен)
+
+- **Go server — race condition в WebSocket**: добавлен `writeMu sync.Mutex` в структуру `Peer` и метод `WriteMessage` с блокировкой.
+- **Go server — ping/keepalive**: добавлена ping-горутина в `signaling/handler.go`.
+- **C# клиент — разбивка MainViewModel**: файл `MainViewModel.cs` (~2600 строк) разбит на partial-файлы:
+  - `MainViewModel.cs` — поля, конструктор, свойства, настройки
+  - `MainViewModel.Connection.cs` — lifecycle сессии, авто-ICE, сигналинг
+  - `MainViewModel.Ice.cs` — мониторинг ICE-кандидатов, UI-индикация
+  - `MainViewModel.Video.cs` — захват/рендер видео, auto-quality, RTT, stats
+  - `MainViewModel.Clipboard.cs` — clipboard sync
+  - `MainViewModel.FileTransfer.cs` — передача файлов
+  - `MainViewModel.Input.cs` — ввод viewer-side, cursor sync
+  - `MainViewModel.Uac.cs` — политика UAC
+  - `MainViewModel.AddressBook.cs` — адресная книга
+- **C# клиент — команды вынесены**: `RelayCommand` / `AsyncRelayCommand` в `UiApp/Commands/RelayCommand.cs`.
+- **Релизный билд**: `dotnet publish` Release win-x64 — 0 ошибок, 0 предупреждений.
+
 ## Не завершено
 
 - Краткоживущий `ws_token` (сейчас заглушка).
 - Интеграция Redis в код сервера (сейчас in-memory).
-- Проверка и стабилизация VP8 end-to-end профилей под реальной нагрузкой (адаптация bitrate/fps).
-- Валидация/ограничение координат `dc-input` на host (защита от выхода за bounds, multi-monitor edge cases).
-- Расширение `dc-file`: `file_ack/file_error`, отмена/возобновление передачи, выбор папки без блокировки удаленного управления.
-- Точный selected ICE candidate pair (сейчас в UI показывается candidate-based `hint`).
+- Валидация/ограничение координат `dc-input` на host (защита от выхода за bounds).
+- Расширение `dc-file`: отмена/возобновление передачи, QoS.
+- Точный selected ICE candidate pair (сейчас candidate-based hint).
 
-## Ближайший этап
+## Будущее
 
-1. Провести стабилизацию захвата/кодирования (нагрузка, multi-monitor, частота кадров, тайминги).
-2. Довести `dc-input` до production-стабильности и расширить `dc-file` (`ack/error/cancel/resume`, QoS под слабый канал).
-3. Перевести обмен SDP/ICE в более строгую схему ролей (caller/callee) и проверить двухсторонний старт.
+- **Hardware H.264/HEVC encoding** (NVENC/QSV/AMF) — потребует замену MixedReality.WebRTC на другую транспортную библиотеку. Ожидаемый выигрыш: ~30% CPU на хосте.
