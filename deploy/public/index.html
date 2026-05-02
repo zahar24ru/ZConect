@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ZConect — lightweight self-hosted remote desktop через WebRTC P2P. Signaling server status.">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="ZConect — WebRTC Remote Desktop">
+    <meta property="og:description" content="Self-hosted remote desktop. P2P WebRTC, no cloud subscription.">
+    <meta property="og:type" content="website">
+    <title>ZConect Signaling Server</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%233b82f6'/><text x='32' y='44' font-family='system-ui,sans-serif' font-size='36' font-weight='700' text-anchor='middle' fill='white'>Z</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            /* Dark polar palette — matches WPF client theme */
+            --bg: #0b1220;
+            --bg-card: #141d2f;
+            --bg-card-hover: #1a2436;
+            --border: #24304a;
+            --text-primary: #e8edf5;
+            --text-secondary: #9aa7bd;
+            --text-muted: #6b7a95;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.15);
+            --success: #22c55e;
+            --success-glow: rgba(34, 197, 94, 0.2);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+        }
+
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background: radial-gradient(ellipse at top, #1a2436 0%, #0b1220 50%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 48px 20px 24px;
+            width: 100%;
+            flex: 1;
+        }
+
+        /* ─── Header ────────────────────────────── */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+            font-size: 36px;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        .subtitle a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(59, 130, 246, 0.4);
+        }
+        .subtitle a:hover { border-bottom-style: solid; }
+
+        /* ─── Status card ────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .status-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            box-shadow: 0 0 0 4px rgba(107, 122, 149, 0.15);
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+
+        .status-dot.ok {
+            background: var(--success);
+            box-shadow: 0 0 0 4px var(--success-glow);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.maintenance {
+            background: var(--warning);
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+        }
+
+        .status-dot.offline {
+            background: var(--danger);
+            box-shadow: 0 0 0 4px var(--danger-glow);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 4px var(--success-glow); }
+            50%      { box-shadow: 0 0 0 8px var(--success-glow); }
+        }
+
+        .status-label {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+        }
+
+        .status-sub {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        /* Info grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .info-value.small { font-size: 14px; font-weight: 500; }
+
+        /* ─── Services card ────────────────────────── */
+        .service-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .service {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .service:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: var(--border);
+        }
+
+        .service-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .service-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .service-desc {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .service-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-ok {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--success);
+        }
+
+        .badge-down {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger);
+        }
+
+        .badge-maintenance {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--warning);
+        }
+
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* ─── Section header ─────────────────────── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .updated-at {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ─── Links card ─────────────────────────── */
+        .links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .link-card {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s;
+        }
+
+        .link-card:hover {
+            background: rgba(59, 130, 246, 0.08);
+            border-color: var(--accent);
+            transform: translateY(-1px);
+        }
+
+        .link-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .link-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .link-icon {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        /* ─── Footer ─────────────────────────────── */
+        footer {
+            text-align: center;
+            padding: 32px 20px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(154, 167, 189, 0.4);
+        }
+        footer a:hover { color: var(--accent); border-color: var(--accent); }
+
+        /* ─── Mobile ─────────────────────────────── */
+        @media (max-width: 480px) {
+            .container { padding: 32px 16px 16px; }
+            h1 { font-size: 26px; }
+            .card { padding: 20px; }
+            .status-label { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="hero">
+            <div class="logo">Z</div>
+            <h1>ZConect</h1>
+            <p class="subtitle">
+                Self-hosted remote desktop • WebRTC P2P •
+                <a href="https://github.com/zahar24rus/zconect" rel="noopener">GitHub</a>
+            </p>
+        </header>
+
+        <!-- Main status card -->
+        <div class="card" id="status-card">
+            <div class="status-row">
+                <div class="status-dot" id="status-dot"></div>
+                <div>
+                    <div class="status-label" id="status-label">Загрузка…</div>
+                    <div class="status-sub" id="status-sub">Проверка подключения к серверу</div>
+                </div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Uptime</div>
+                    <div class="info-value" id="uptime">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Запущен</div>
+                    <div class="info-value small" id="started-at">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Версия</div>
+                    <div class="info-value small" id="version">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services card -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">Службы</div>
+                <div class="updated-at" id="updated-at">обновлено: —</div>
+            </div>
+
+            <div class="service-list">
+                <div class="service">
+                    <div class="service-info">
+                        <div class="service-name">Signaling API</div>
+                        <div class="service-desc">HTTPS · SDP/ICE exchange · session management</div>
+                    </div>
+                    <div class="service-badge badge-ok" id="svc-signaling">
+                        <div class="badge-dot"></div>
+                        <span>online</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <div class="service-info">
+                        <div class="service-name">WebSocket</div>
+                        <div class="service-desc">WSS · real-time signaling</div>
+                    </div>
+                    <div class="service-badge badge-ok" id="svc-ws">
+                        <div class="badge-dot"></div>
+                        <span>online</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <div class="service-info">
+                        <div class="service-name">TURN relay</div>
+                        <div class="service-desc">coturn · 3478/udp · для NAT traversal</div>
+                    </div>
+                    <div class="service-badge badge-ok" id="svc-turn">
+                        <div class="badge-dot"></div>
+                        <span>online</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick links -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">Ссылки</div>
+            </div>
+
+            <div class="links">
+                <a href="/admin/login" class="link-card">
+                    <div class="link-icon">🔐</div>
+                    <div class="link-title">Admin panel</div>
+                    <div class="link-desc">Требует пароль</div>
+                </a>
+                <a href="https://github.com/zahar24rus/zconect" rel="noopener" class="link-card">
+                    <div class="link-icon">📦</div>
+                    <div class="link-title">Source code</div>
+                    <div class="link-desc">Open source · Go + C# + Kotlin</div>
+                </a>
+                <a href="/healthz" class="link-card">
+                    <div class="link-icon">💚</div>
+                    <div class="link-title">Health check</div>
+                    <div class="link-desc">Для uptime monitors</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        ZConect · powered by <a href="https://caddyserver.com" rel="noopener">Caddy</a> +
+        Let's Encrypt · <span id="current-year">2026</span>
+    </footer>
+
+    <script>
+        // ─── Status polling ─────────────────────────
+        // Каждые 10 сек запрашиваем /api/v1/status и обновляем UI.
+        // При network error показываем "offline" — важно для "любопытных"
+        // чтобы не видеть статичный "online" badge когда сервер мёртв.
+
+        const STATUS_URL = '/api/v1/status';
+        const POLL_INTERVAL_MS = 10_000;
+
+        // Server clock offset — для корректного uptime counter даже если клиент
+        // has выключал страницу и server уже ушёл далеко. Обновляется при каждом poll.
+        let serverStartedAt = null;   // Unix seconds
+        let lastPollServerTime = null; // Unix seconds
+        let lastPollLocalTime = null;  // Date.now() ms
+        let isOnline = false;
+        let maintenance = false;
+
+        async function poll() {
+            try {
+                const resp = await fetch(STATUS_URL, { cache: 'no-store' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                updateUI(data);
+                isOnline = true;
+                maintenance = data.maintenance === true;
+            } catch (err) {
+                setOffline();
+                isOnline = false;
+            }
+            updateBadges();
+            updateTimestamp();
+        }
+
+        function updateUI(data) {
+            serverStartedAt = data.started_at_unix;
+            lastPollServerTime = data.server_time_unix;
+            lastPollLocalTime = Date.now();
+
+            const dot = document.getElementById('status-dot');
+            const label = document.getElementById('status-label');
+            const sub = document.getElementById('status-sub');
+
+            if (data.status === 'maintenance') {
+                dot.className = 'status-dot maintenance';
+                label.textContent = 'Режим обслуживания';
+                sub.textContent = 'Новые подключения временно недоступны';
+            } else {
+                dot.className = 'status-dot ok';
+                label.textContent = 'Работает';
+                sub.textContent = 'Сервер доступен, принимает новые подключения';
+            }
+
+            document.getElementById('version').textContent = 'v' + (data.version || '—');
+
+            const startedDate = new Date(data.started_at_unix * 1000);
+            document.getElementById('started-at').textContent = formatDate(startedDate);
+        }
+
+        function setOffline() {
+            const dot = document.getElementById('status-dot');
+            const label = document.getElementById('status-label');
+            const sub = document.getElementById('status-sub');
+            dot.className = 'status-dot offline';
+            label.textContent = 'Недоступен';
+            sub.textContent = 'Не удалось подключиться к серверу';
+            document.getElementById('uptime').textContent = '—';
+        }
+
+        function updateBadges() {
+            const ids = ['svc-signaling', 'svc-ws', 'svc-turn'];
+            for (const id of ids) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+                const dot = el.querySelector('.badge-dot');
+                const text = el.querySelector('span');
+                el.classList.remove('badge-ok', 'badge-down', 'badge-maintenance');
+                if (!isOnline) {
+                    el.classList.add('badge-down');
+                    text.textContent = 'unknown';
+                } else if (maintenance) {
+                    el.classList.add('badge-maintenance');
+                    text.textContent = 'maintenance';
+                } else {
+                    el.classList.add('badge-ok');
+                    text.textContent = 'online';
+                }
+            }
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('updated-at').textContent =
+                'обновлено: ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        // ─── Uptime counter ─────────────────────────
+        // Обновляем каждую секунду. Uptime рассчитывается от serverStartedAt
+        // (установлен при последнем poll'е). Пока сервер online — растёт.
+
+        function tickUptime() {
+            if (!serverStartedAt || !isOnline) return;
+            // Estimate current server time = serverTimeAtLastPoll + (now - localTimeAtLastPoll)
+            const elapsedSinceLastPoll = (Date.now() - lastPollLocalTime) / 1000;
+            const estimatedServerTime = lastPollServerTime + elapsedSinceLastPoll;
+            const uptimeSec = Math.max(0, Math.floor(estimatedServerTime - serverStartedAt));
+            document.getElementById('uptime').textContent = formatDuration(uptimeSec);
+        }
+
+        function formatDuration(totalSec) {
+            const days = Math.floor(totalSec / 86400);
+            const hours = Math.floor((totalSec % 86400) / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+
+            if (days > 0) return `${days}д ${hours}ч ${mins}м`;
+            if (hours > 0) return `${hours}ч ${mins}м ${secs}с`;
+            if (mins > 0) return `${mins}м ${secs}с`;
+            return `${secs}с`;
+        }
+
+        function formatDate(d) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        // ─── Boot ───────────────────────────────────
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        poll();
+        setInterval(poll, POLL_INTERVAL_MS);
+        setInterval(tickUptime, 1000);
+    </script>
+</body>
+</html>

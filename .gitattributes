@@ -1,0 +1,55 @@
+# Auto-detect text files and normalize line endings to LF in repo,
+# checkout to platform-native (CRLF on Windows, LF on Unix).
+* text=auto
+
+# Source code — text, with language-aware diffs where supported
+*.cs       text diff=csharp
+*.csproj   text
+*.sln      text
+*.xaml     text
+*.go       text
+*.kt       text
+*.kts      text
+*.md       text
+*.txt      text
+*.json     text
+*.xml      text
+*.html     text
+*.css      text
+*.js       text
+*.yml      text
+*.yaml     text
+*.toml     text
+*.resx     text
+*.iss      text
+*.gradle   text
+*.properties text
+
+# Platform-specific scripts — preserve native line endings
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+*.sh       text eol=lf
+
+# Binary — never auto-normalize
+*.dll      binary
+*.exe      binary
+*.pdb      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.svg      text
+*.zip      binary
+*.tar      binary
+*.gz       binary
+*.7z       binary
+*.pdf      binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.eot      binary
+
+# Large binaries — Git LFS
+*.dmp      filter=lfs diff=lfs merge=lfs -text

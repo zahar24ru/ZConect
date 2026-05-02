@@ -1,0 +1,135 @@
+# docker-compose для FAST DEPLOY — binary собирается на PC,
+# монтируется в alpine-контейнер. Никакого go build на сервере.
+#
+# Использование:
+#   # Первый раз:
+#   ./deploy_setup.ps1 -VpsIp ... -SshUser ... -TurnPass ...
+#
+#   # С HTTPS (после того как DNS A-record указывает на VPS):
+#   ./deploy_setup.ps1 -VpsIp ... -Domain connect.zconn.ru -AdminEmail you@example.com ...
+#
+#   # Каждый deploy (20-30 сек вместо 3-5 мин):
+#   ./deploy_fast.ps1 -VpsIp ...
+#
+# Что сохраняется между deploy'ями:
+#   - signaling-data volume (telemetry.db, client-version.json, admin-audit.log)
+#   - caddy-data volume (Let's Encrypt certs — выживает rebuild!)
+#   - caddy-config volume (ACME state)
+#   - .env на сервере (не перезаписывается)
+#   - все bind-mounted файлы
+#
+# ВАЖНО: signaling использует env_file:, а не ${VAR} substitution в environment:.
+# Причина — bcrypt hash ADMIN_PASSWORD_HASH содержит символы $ ($2a$12$...), которые
+# docker-compose интерпретирует как ссылки на переменные и warning'ит. С env_file
+# значения передаются в контейнер БЕЗ substitution'а.
+
+services:
+  signaling:
+    # Thin runtime — просто alpine + наш pre-built binary.
+    # Binary build'ится на PC: GOOS=linux GOARCH=amd64 go build.
+    image: alpine:3.21
+    container_name: zconect-signaling
+    # env_file передаёт все переменные из .env в контейнер AS-IS (без $-interpolation).
+    # Важно для ADMIN_PASSWORD_HASH которое содержит `$` в bcrypt формате.
+    env_file:
+      - .env
+    # Fixed paths поверх .env — задаём явно, чтобы не полагаться на .env.
+    environment:
+      TELEMETRY_DB_PATH: "/app/data/telemetry.db"
+      CLIENT_VERSION_FILE: "/app/data/client-version.json"
+      ADMIN_AUDIT_LOG: "/app/data/admin-audit.log"
+      # В prod с Caddy reverse proxy — trust Caddy IP чтобы server использовал
+      # X-Forwarded-For / X-Real-IP для client IP detection (rate limit, ban, audit).
+      # Caddy сидит в той же docker network → его IP = 172.x.x.x (internal bridge).
+      # Trusting ENTIRE docker network — safe т.к. only Caddy говорит с signaling:8080.
+      TRUSTED_PROXIES: "172.16.0.0/12"
+      # CookieSecure=true когда Caddy terminates TLS перед нами. Admin cookie
+      # не шлётся без HTTPS — правильно для production.
+      ADMIN_COOKIE_SECURE: "true"
+    volumes:
+      # Pre-built binary — read-only mount. Deploy просто заменяет файл.
+      - ./bin/signaling:/app/signaling:ro
+      # Persistent data: DB, client-version.json, admin-audit.log.
+      # Всё переживает restart/redeploy.
+      - signaling-data:/app/data
+    command: /app/signaling
+    working_dir: /app
+    # БЕЗ ports: — signaling доступен только через docker network (caddy → signaling).
+    # Если надо debug port exposed на host — раскомментируй (НО тогда HTTP доступен
+    # напрямую минуя TLS):
+    # ports:
+    #   - "${SIGNALING_PORT:-8080}:8080"
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: zconect-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP (ACME challenge + redirect to HTTPS)
+      - "443:443"   # HTTPS (HTTP/2)
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    volumes:
+      # Caddyfile генерируется deploy скриптом из Caddyfile.template с подстановкой
+      # {$SIGNALING_DOMAIN} и {$ADMIN_EMAIL}. Read-only — Caddy re-читает через
+      # `caddy reload` который требует только read доступ. Если Caddy получит
+      # RCE (например будущая CVE в file_server), RW mount позволил бы persist
+      # rogue config на host'е — ro это блокирует.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Static landing page + assets. Обслуживается Caddy'ем по / (root).
+      # Read-only — файлы меняются только на PC + scp при deploy.
+      - ./public:/srv:ro
+      # Let's Encrypt certs — persistent! ОЧЕНЬ ВАЖНО:
+      # - LE имеет rate limit (50 certs per week per domain). Без volume каждый rebuild
+      #   запрашивает новый cert → упираемся в rate limit за день.
+      # - caddy-data содержит private keys + OCSP staples — критично для uptime.
+      - caddy-data:/data
+      - caddy-config:/config
+      # Access logs (optional — для traffic analysis)
+      - caddy-logs:/var/log/caddy
+    depends_on:
+      - signaling
+    environment:
+      # Caddy подхватывает {$SIGNALING_DOMAIN} и {$ADMIN_EMAIL} из env при rendering Caddyfile.
+      # Не критично если пустые — deploy script уже substitute'нул в Caddyfile.
+      SIGNALING_DOMAIN: "${SIGNALING_DOMAIN:-}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-}"
+
+  coturn:
+    image: coturn/coturn:4.6.2
+    container_name: zconect-coturn
+    # Rotating TURN auth (RFC 7635 / ephemeral credentials):
+    #   --use-auth-secret + --static-auth-secret=<TURN_AUTH_SECRET>
+    # Signaling server генерирует per-client short-term creds с HMAC-SHA1 от
+    # того же secret'а. Coturn валидирует: парсит expiration_ts из username,
+    # проверяет now() < expiration_ts, recomputes HMAC, сравнивает с credential.
+    # Если всё OK → allow relay.
+    #
+    # Важно: --lt-cred-mech и --use-auth-secret взаимоисключающие. Оставляем
+    # только use-auth-secret. TURN_USER / TURN_PASS из старого .env теперь
+    # НЕ нужны (но остаются — smart-merge не удаляет).
+    command: >
+      -n
+      --log-file=stdout
+      --realm=${TURN_REALM:-zconect.local}
+      --fingerprint
+      --use-auth-secret
+      --static-auth-secret=${TURN_AUTH_SECRET}
+      --external-ip=${PUBLIC_IPV4}
+      --listening-port=3478
+      --min-port=49152
+      --max-port=49200
+      --no-tls
+      --no-dtls
+    ports:
+      - "3478:3478/udp"
+      - "49152-49200:49152-49200/udp"
+    restart: unless-stopped
+
+volumes:
+  signaling-data:
+  caddy-data:
+  caddy-config:
+  caddy-logs:

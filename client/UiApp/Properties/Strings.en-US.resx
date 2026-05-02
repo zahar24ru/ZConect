@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0"/></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string"/><xsd:attribute name="type" type="xsd:string"/><xsd:attribute name="mimetype" type="xsd:string"/><xsd:attribute ref="xml:space"/></xsd:complexType></xsd:element>
+          <xsd:element name="assembly"><xsd:complexType><xsd:attribute name="alias" type="xsd:string"/><xsd:attribute name="name" type="xsd:string"/></xsd:complexType></xsd:element>
+          <xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/><xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2"/></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1"/><xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3"/><xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4"/><xsd:attribute ref="xml:space"/></xsd:complexType></xsd:element>
+          <xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required"/></xsd:complexType></xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <!-- Menu + tabs -->
+  <data name="MenuButton" xml:space="preserve"><value>Menu</value></data>
+  <data name="MenuSettings" xml:space="preserve"><value>Settings</value></data>
+  <data name="MenuClearRecent" xml:space="preserve"><value>Clear "Recently Connected"</value></data>
+  <data name="MenuExit" xml:space="preserve"><value>Exit</value></data>
+  <data name="HelpTooltip" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="ThemeToggleTooltip" xml:space="preserve"><value>Toggle theme</value></data>
+  <data name="TabCreateSession" xml:space="preserve"><value>Create session</value></data>
+  <data name="TabJoin" xml:space="preserve"><value>Connect</value></data>
+  <data name="TabAddressBook" xml:space="preserve"><value>Address book</value></data>
+
+  <!-- Main window common -->
+  <data name="LabelLogin" xml:space="preserve"><value>Login</value></data>
+  <data name="LabelPassword" xml:space="preserve"><value>Password</value></data>
+  <data name="CreateSessionButton" xml:space="preserve"><value>Create session</value></data>
+  <data name="RefreshPasswordButton" xml:space="preserve"><value>Refresh password</value></data>
+  <data name="RecentConnected" xml:space="preserve"><value>Recently connected</value></data>
+  <data name="ToAddressBookLink" xml:space="preserve"><value>To address book →</value></data>
+  <data name="JoinIntro" xml:space="preserve"><value>Enter login and password, then connect</value></data>
+  <data name="JoinButton" xml:space="preserve"><value>Connect</value></data>
+  <data name="AddContactTitle" xml:space="preserve"><value>Add contact</value></data>
+  <data name="LabelName" xml:space="preserve"><value>Name</value></data>
+  <data name="LabelCodes" xml:space="preserve"><value>Login and password (8 digits each)</value></data>
+  <data name="AddButton" xml:space="preserve"><value>Add</value></data>
+  <data name="EmptyContacts" xml:space="preserve"><value>No saved contacts</value></data>
+  <data name="EmptyContactsHint" xml:space="preserve"><value>Add the first one on the right →</value></data>
+  <data name="Join_LoginPlaceholder" xml:space="preserve"><value>Login (8 digits)</value></data>
+  <data name="Join_PasswordPlaceholder" xml:space="preserve"><value>Password (8 digits)</value></data>
+  <data name="AddressBook_Contacts" xml:space="preserve"><value>Contacts</value></data>
+  <data name="AddressBook_Edit_Tooltip" xml:space="preserve"><value>Edit</value></data>
+  <data name="AddressBook_ContactName_Placeholder" xml:space="preserve"><value>Work PC</value></data>
+  <data name="Tooltip_CopyLoginPassword" xml:space="preserve"><value>Click to copy login and password</value></data>
+  <data name="Tooltip_SaveToAddressBook" xml:space="preserve"><value>Save to address book</value></data>
+
+  <!-- Update badge -->
+  <data name="Update_Badge_Label" xml:space="preserve"><value>Update:</value></data>
+  <data name="Update_Tooltip_NewVersion" xml:space="preserve"><value>New version</value></data>
+  <data name="Update_Tooltip_Available" xml:space="preserve"><value>available</value></data>
+  <data name="Update_Tooltip_ClickToOpen" xml:space="preserve"><value>Click to open download page</value></data>
+
+  <!-- Lockout banner -->
+  <data name="LockoutBanner_OpenSettings_Tooltip" xml:space="preserve"><value>Open settings — remove lockout</value></data>
+
+  <!-- Toast -->
+  <data name="Toast_ViewerConnected" xml:space="preserve"><value>A viewer has connected to you</value></data>
+
+  <!-- Onboarding -->
+  <data name="Onboarding_Welcome_Title" xml:space="preserve"><value>Welcome to ZConnect</value></data>
+  <data name="Onboarding_Welcome_Text" xml:space="preserve"><value>Quick 3-step guide. We'll show how to connect to another PC.</value></data>
+
+  <!-- Dialogs -->
+  <data name="Dialog_Title_Confirm" xml:space="preserve"><value>Confirmation</value></data>
+  <data name="Dialog_Title_SaveConnection" xml:space="preserve"><value>Save connection</value></data>
+  <data name="Dialog_Title_UnattendedPassword" xml:space="preserve"><value>Connect to remote host</value></data>
+  <data name="Dialog_Title_SetPassword" xml:space="preserve"><value>Quick connection password</value></data>
+  <data name="Dialog_PromptTitle" xml:space="preserve"><value>Give this connection a name</value></data>
+  <data name="Dialog_PromptMessage" xml:space="preserve"><value>A meaningful name ("Mom's PC", "Office") helps you quickly find the contact in address book and "Recently connected".</value></data>
+  <data name="Dialog_Password_Hint" xml:space="preserve"><value>Enter remote host's local password</value></data>
+  <data name="Dialog_Password_Hint2" xml:space="preserve"><value>If password is correct — connection goes through without host-side confirmation. Otherwise host sees "Allow / Deny" dialog.</value></data>
+  <data name="Dialog_Password_MinLength" xml:space="preserve"><value>Minimum 6 characters</value></data>
+  <data name="Dialog_Password_ToggleTooltip" xml:space="preserve"><value>Show / hide password</value></data>
+  <data name="Dialog_SetPassword_Hint" xml:space="preserve"><value>Any viewer knowing this password can connect without a confirmation dialog. Keep it secret.</value></data>
+  <data name="Dialog_SetPassword_Heading" xml:space="preserve"><value>Set local password</value></data>
+  <data name="Dialog_SetPassword_NewPassword" xml:space="preserve"><value>New password</value></data>
+  <data name="Dialog_SetPassword_ConfirmLabel" xml:space="preserve"><value>Confirm password</value></data>
+  <data name="Dialog_SetPassword_ShowButton" xml:space="preserve"><value>👁 Show</value></data>
+  <data name="Dialog_SetPassword_HideButton" xml:space="preserve"><value>👁 Hide</value></data>
+  <data name="Dialog_SetPassword_Toggle_Tooltip" xml:space="preserve"><value>Show / hide passwords</value></data>
+  <data name="Dialog_RememberPassword_Checkbox" xml:space="preserve"><value>Remember password for this contact</value></data>
+  <data name="Dialog_RememberPassword_Tooltip" xml:space="preserve"><value>Password will be saved encrypted in address book. Don't use on shared PC.</value></data>
+
+  <!-- Common buttons -->
+  <data name="Button_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Button_Later" xml:space="preserve"><value>Later</value></data>
+  <data name="Button_Save" xml:space="preserve"><value>Save</value></data>
+  <data name="Button_Connect" xml:space="preserve"><value>Connect</value></data>
+  <data name="Button_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Button_Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Button_Skip" xml:space="preserve"><value>Skip</value></data>
+  <data name="Button_Next" xml:space="preserve"><value>Next →</value></data>
+  <data name="Button_RequestPermission" xml:space="preserve"><value>Request permission</value></data>
+  <data name="Button_CheckUpdateNow" xml:space="preserve"><value>Check now</value></data>
+  <data name="Button_TestConnection" xml:space="preserve"><value>Test connection</value></data>
+  <data name="Button_TestConnection_Tooltip" xml:space="preserve"><value>Send GET /healthz and show result</value></data>
+  <data name="Button_OpenLogFile" xml:space="preserve"><value>Open log file</value></data>
+  <data name="Button_OpenLogFile_Tooltip" xml:space="preserve"><value>Open logs.log in default editor</value></data>
+  <data name="Button_ClearLogFiles" xml:space="preserve"><value>Clear logs</value></data>
+  <data name="Button_ClearLogFiles_Tooltip" xml:space="preserve"><value>Delete all log files (logs.log and rotated)</value></data>
+  <data name="Button_TaskManager" xml:space="preserve"><value>Task Manager</value></data>
+  <data name="Button_TaskManager_Tooltip" xml:space="preserve"><value>Launch Task Manager on remote side — opens in video feed. Use to kill hung process.</value></data>
+  <data name="Button_Reconnect" xml:space="preserve"><value>Reconnect</value></data>
+  <data name="Button_Reconnect_Tooltip" xml:space="preserve"><value>Reconnect with current settings (keeps session)</value></data>
+  <data name="Button_FileTransfer" xml:space="preserve"><value>Files</value></data>
+
+  <!-- Settings window -->
+  <data name="SettingsWindowTitle" xml:space="preserve"><value>ZConnect — Settings</value></data>
+  <data name="SettingsLanguageLabel" xml:space="preserve"><value>Language</value></data>
+  <data name="SettingsLanguageHint" xml:space="preserve"><value>(restart required)</value></data>
+  <data name="Settings_Language_Tooltip" xml:space="preserve"><value>UI language (restart required)</value></data>
+  <data name="LanguageRussian" xml:space="preserve"><value>Русский</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="Settings_Tab_Application" xml:space="preserve"><value>Application</value></data>
+  <data name="Settings_Tab_Server" xml:space="preserve"><value>Server</value></data>
+  <data name="Settings_Tab_Logs" xml:space="preserve"><value>Logs</value></data>
+  <data name="Settings_Tab_About" xml:space="preserve"><value>About</value></data>
+  <data name="Settings_Session_Label" xml:space="preserve"><value>Session</value></data>
+  <data name="Settings_Updates_Label" xml:space="preserve"><value>Updates</value></data>
+  <data name="Settings_Security_Label" xml:space="preserve"><value>Security</value></data>
+  <data name="Settings_Unattended_Card_Title" xml:space="preserve"><value>Unattended access password</value></data>
+  <data name="Settings_AutoCreate" xml:space="preserve"><value>Automatically create session on startup</value></data>
+  <data name="Settings_AutoCreate_Tooltip" xml:space="preserve"><value>Session is created automatically on app startup, no button click needed</value></data>
+  <data name="Settings_AutoUpdate" xml:space="preserve"><value>Check for updates on startup</value></data>
+  <data name="Settings_AutoUpdate_Tooltip" xml:space="preserve"><value>Every 6 hours checks /api/v1/client/version. If new version available — badge appears in header. No auto-install, only notification.</value></data>
+  <data name="Settings_Unattended" xml:space="preserve"><value>Allow unattended connection (requires password below)</value></data>
+  <data name="Settings_Unattended_Tooltip" xml:space="preserve"><value>Viewer with local password connects without confirmation. Password is set below</value></data>
+  <data name="Settings_Unattended_Status_NotRequired" xml:space="preserve"><value>🔓 Connections require manual confirmation</value></data>
+  <data name="Settings_Unattended_Status_Set" xml:space="preserve"><value>🔒 Connections accepted by password — no manual confirmation</value></data>
+  <data name="Settings_SetPassword" xml:space="preserve"><value>Set password</value></data>
+  <data name="Settings_ChangePassword" xml:space="preserve"><value>Change password</value></data>
+  <data name="Settings_LockoutActive" xml:space="preserve"><value>🔒 Lockout active</value></data>
+  <data name="Settings_ResetLockout" xml:space="preserve"><value>Remove lockout</value></data>
+  <data name="Settings_ResetLockout_Tooltip" xml:space="preserve"><value>Reset failed attempts counter and active timeout</value></data>
+  <data name="Settings_FileTransferOnly" xml:space="preserve"><value>File transfer only (no remote desktop)</value></data>
+  <data name="Settings_FileTransferOnly_Tooltip" xml:space="preserve"><value>Video stream disabled on connect — file transfer only</value></data>
+  <data name="Settings_SessionDuration" xml:space="preserve"><value>Session lifetime:</value></data>
+  <data name="Settings_SessionDuration_Tooltip" xml:space="preserve"><value>Session expires after this time. Auto-renewal at 20% remaining</value></data>
+  <data name="Settings_Option_5min" xml:space="preserve"><value>5 minutes</value></data>
+  <data name="Settings_Option_30min" xml:space="preserve"><value>30 minutes</value></data>
+  <data name="Settings_Option_1hour" xml:space="preserve"><value>1 hour</value></data>
+  <data name="Settings_Option_24hour" xml:space="preserve"><value>24 hours</value></data>
+  <data name="Settings_Option_7days" xml:space="preserve"><value>7 days</value></data>
+  <data name="Settings_ID_Label" xml:space="preserve"><value>ID</value></data>
+  <data name="Settings_ID_Tooltip" xml:space="preserve"><value>Unique ID of this machine. Used for session reuse after restart</value></data>
+  <data name="Settings_ServerAddresses" xml:space="preserve"><value>Connection addresses</value></data>
+  <data name="Settings_ServerAPI_Tooltip" xml:space="preserve"><value>HTTP(S) address of signaling server. Use https:// for prod (Caddy+Let's Encrypt), http:// for dev/LAN. Example: https://connect.example.com</value></data>
+  <data name="Settings_WebSocket_Tooltip" xml:space="preserve"><value>WS(S) address for SDP/ICE exchange. Client auto-upgrades to wss:// if Server API URL = https://.</value></data>
+  <data name="Settings_STUN_TURN_Label" xml:space="preserve"><value>STUN / TURN</value></data>
+  <!-- TURN status panel (Variant C UI redesign 2026-04-25) — live status of rotating creds. -->
+  <data name="Settings_TURN_Status_Active" xml:space="preserve"><value>TURN: rotation active (per-session creds from server)</value></data>
+  <data name="Settings_TURN_Status_Static" xml:space="preserve"><value>TURN: static creds (manual config below)</value></data>
+  <data name="Settings_TURN_Status_None" xml:space="preserve"><value>TURN: not configured (STUN-only — no NAT relay)</value></data>
+  <data name="Settings_TURN_Live_Url_Label" xml:space="preserve"><value>Current relay</value></data>
+  <data name="Settings_TURN_Live_Username_Label" xml:space="preserve"><value>Username (HMAC)</value></data>
+  <data name="Settings_TURN_Expires_Label" xml:space="preserve"><value>Expires in</value></data>
+  <data name="Settings_TURN_Expires_Format" xml:space="preserve"><value>{0} min (auto-refresh on reconnect)</value></data>
+  <data name="Settings_TURN_Expires_Soon_Format" xml:space="preserve"><value>{0} sec (refresh soon)</value></data>
+  <data name="Settings_TURN_Custom_Header" xml:space="preserve"><value>Custom TURN configuration (for your own server)</value></data>
+  <data name="Settings_TURN_Custom_Hint" xml:space="preserve"><value>Fill only if using custom TURN server. For standard prod (https://connect.zconn.ru) creds come auto from server — leave empty.</value></data>
+  <data name="Settings_STUN_Tooltip" xml:space="preserve"><value>STUN server for public IP detection. Format: stun:host:port</value></data>
+  <data name="Settings_TURN_Tooltip" xml:space="preserve"><value>TURN server for NAT traffic relay. Format: turn:host:port</value></data>
+  <data name="Settings_TURN_Username_Tooltip" xml:space="preserve"><value>Username for TURN server authentication</value></data>
+  <data name="Settings_TURN_Password_Tooltip" xml:space="preserve"><value>Password for TURN server authentication</value></data>
+  <data name="Settings_Diagnostics_Label" xml:space="preserve"><value>Route diagnostics</value></data>
+  <data name="Settings_ForceRelay" xml:space="preserve"><value>Force TURN (Relay only)</value></data>
+  <data name="Settings_ForceRelay_Tooltip" xml:space="preserve"><value>Force TURN relay, don't collect host/srflx. For diagnostics or to hide local IP from peer. Applied on next connection.</value></data>
+  <data name="Settings_DisableTURN" xml:space="preserve"><value>Disable TURN (LAN/STUN only)</value></data>
+  <data name="Settings_DisableTURN_Tooltip" xml:space="preserve"><value>Don't add TURN server to ICE. Only if peer is directly accessible (LAN/VPN). Applied on next connection.</value></data>
+  <data name="Settings_AutoConnection_Hint" xml:space="preserve"><value>Connection is automatic: all methods (LAN, STUN, TURN) used simultaneously for max speed. Route optimizes in background after connection.</value></data>
+  <data name="Settings_Debug_Filters_Label" xml:space="preserve"><value>DEBUG log filters</value></data>
+  <data name="Settings_Debug_Filters_Hint" xml:space="preserve"><value>Manage noisy DEBUG message categories. Changes apply immediately.</value></data>
+  <data name="Settings_DebugFilter_DCInput_Tooltip" xml:space="preserve"><value>Mouse and keyboard event send/receive logs</value></data>
+  <data name="Settings_DebugFilter_Clipboard_Tooltip" xml:space="preserve"><value>Clipboard synchronization logs</value></data>
+  <data name="Settings_DebugFilter_Signaling_Tooltip" xml:space="preserve"><value>WebSocket exchange logs: SDP, ICE, peer_state</value></data>
+  <data name="Settings_DebugFilter_WebRTC_Tooltip" xml:space="preserve"><value>Low-level WebRTC logs: connection, codecs, ICE</value></data>
+  <data name="Settings_LogFiles_Label" xml:space="preserve"><value>Log files</value></data>
+  <data name="Settings_ICE_Debug_Label" xml:space="preserve"><value>ICE Debug</value></data>
+  <data name="Settings_ICE_Debug_Hint" xml:space="preserve"><value>Current ICE route state (updates real-time when connected).</value></data>
+  <data name="Settings_ICE_Debug_Tooltip" xml:space="preserve"><value>ICE route type: LAN, WAN (STUN) or Relay (TURN)</value></data>
+  <data name="Settings_About_Intro" xml:space="preserve"><value>Remote desktop and file transfer. Open-source project for fast remote access via WebRTC with minimal latency.</value></data>
+  <data name="Settings_About_Intro_Line1" xml:space="preserve"><value>Remote desktop and file transfer.</value></data>
+  <data name="Settings_About_Intro_Line2" xml:space="preserve"><value>Open-source project for fast remote access</value></data>
+  <data name="Settings_About_Intro_Line3" xml:space="preserve"><value>via WebRTC with minimal latency.</value></data>
+  <data name="Settings_About_Platform" xml:space="preserve"><value>Platform:</value></data>
+  <data name="Settings_About_Capture" xml:space="preserve"><value>Capture:</value></data>
+  <data name="Settings_About_Transport" xml:space="preserve"><value>Transport:</value></data>
+  <data name="Settings_About_Server" xml:space="preserve"><value>Server:</value></data>
+  <data name="Settings_About_Website" xml:space="preserve"><value>Website:</value></data>
+  <data name="Settings_About_Copyright" xml:space="preserve"><value>© 2026 ZConnect</value></data>
+  <data name="Settings_About_PrivacyPolicy" xml:space="preserve"><value>Privacy Policy</value></data>
+  <data name="Settings_About_MadeWith" xml:space="preserve"><value>Made with vibe-coding:</value></data>
+
+  <!-- Remote screen window -->
+  <data name="RemoteScreen_Title" xml:space="preserve"><value>ZConnect — Remote Desktop</value></data>
+  <data name="RemoteScreen_Quality_Label" xml:space="preserve"><value>Quality</value></data>
+  <data name="RemoteScreen_Display_Label" xml:space="preserve"><value>Display</value></data>
+  <data name="RemoteScreen_WaitingForVideo" xml:space="preserve"><value>Waiting for video stream...</value></data>
+  <data name="RemoteScreen_FileTransfer_Tooltip" xml:space="preserve"><value>File Transfer</value></data>
+
+  <!-- File transfer window -->
+  <data name="FileTransfer_Title" xml:space="preserve"><value>ZConnect — File Transfer</value></data>
+  <data name="FileTransfer_LocalPanel" xml:space="preserve"><value>Local (this PC)</value></data>
+  <data name="FileTransfer_Tooltip_Home" xml:space="preserve"><value>Home (drives)</value></data>
+  <data name="FileTransfer_Tooltip_Up" xml:space="preserve"><value>Up</value></data>
+  <data name="FileTransfer_Tooltip_Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="FileTransfer_NewFolder" xml:space="preserve"><value>New folder</value></data>
+  <data name="FileTransfer_Button_Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="FileTransfer_Tooltip_Sort" xml:space="preserve"><value>Sort</value></data>
+  <data name="FileTransfer_Sort_Name" xml:space="preserve"><value>By name</value></data>
+  <data name="FileTransfer_Sort_Size" xml:space="preserve"><value>By size</value></data>
+  <data name="FileTransfer_Sort_Type" xml:space="preserve"><value>By type</value></data>
+  <data name="FileTransfer_View_Details" xml:space="preserve"><value>Details</value></data>
+  <data name="FileTransfer_View_Small" xml:space="preserve"><value>Small</value></data>
+  <data name="FileTransfer_View_Large" xml:space="preserve"><value>Large</value></data>
+  <data name="FileTransfer_ContextMenu_Properties" xml:space="preserve"><value>Properties</value></data>
+  <data name="FileTransfer_ContextMenu_Rename" xml:space="preserve"><value>Rename  F2</value></data>
+  <data name="FileTransfer_ContextMenu_CopyPath" xml:space="preserve"><value>Copy path</value></data>
+  <data name="FileTransfer_ContextMenu_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="FileTransfer_Button_Pause" xml:space="preserve"><value>Pause</value></data>
+  <data name="FileTransfer_Button_Resume" xml:space="preserve"><value>Resume</value></data>
+  <data name="FileTransfer_Button_CancelAll" xml:space="preserve"><value>Cancel all</value></data>
+  <data name="FileTransfer_Status_NoTransfers" xml:space="preserve"><value>No active transfers</value></data>
+  <data name="FileTransfer_Status_Loading" xml:space="preserve"><value>Loading...</value></data>
+
+  <!-- Toasts / Tray / Theme -->
+  <data name="Toast_MinimizedToTray" xml:space="preserve"><value>App minimized to tray</value></data>
+  <data name="Toast_ViewerConnectedToSession" xml:space="preserve"><value>Viewer connected to your session</value></data>
+  <data name="Tray_Open" xml:space="preserve"><value>Open</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Theme_Light_Tooltip" xml:space="preserve"><value>Light theme</value></data>
+  <data name="Theme_Dark_Tooltip" xml:space="preserve"><value>Dark theme</value></data>
+
+  <!-- Help dialog -->
+  <data name="Help_Title" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="Help_Shortcut_ToggleTheme" xml:space="preserve"><value>Toggle theme</value></data>
+  <data name="Help_Shortcut_OpenSettings" xml:space="preserve"><value>Open settings</value></data>
+  <data name="Help_Shortcut_MainTabs" xml:space="preserve"><value>Main window tabs</value></data>
+  <data name="Help_Shortcut_CloseDialog" xml:space="preserve"><value>Close settings / this dialog</value></data>
+  <data name="Help_NotYetMessage" xml:space="preserve"><value>Help will be added in future versions.</value></data>
+  <data name="Help_AboutTitle" xml:space="preserve"><value>About</value></data>
+
+  <!-- Logs -->
+  <data name="Logs_NotFound" xml:space="preserve"><value>Log file not yet created.</value></data>
+  <data name="Logs_OpenError_Format" xml:space="preserve"><value>Couldn't open log: {0}</value></data>
+  <data name="Logs_Category" xml:space="preserve"><value>Logs</value></data>
+
+  <!-- Session code copy -->
+  <data name="Session_Copy_LoginLabel" xml:space="preserve"><value>Login:</value></data>
+  <data name="Session_Copy_PasswordLabel" xml:space="preserve"><value>Password:</value></data>
+  <data name="Session_NotCreatedYet" xml:space="preserve"><value>Create a session first</value></data>
+  <data name="Session_CopyError" xml:space="preserve"><value>Couldn't copy login/password</value></data>
+
+  <!-- Update check (Settings) -->
+  <data name="UpdateCheck_ServerReturned_Format" xml:space="preserve"><value>Server returned {0}</value></data>
+  <data name="UpdateCheck_EmptyResponse" xml:space="preserve"><value>Empty server response</value></data>
+  <data name="UpdateCheck_UpToDate_Format" xml:space="preserve"><value>✓ You have the latest version (v{0})</value></data>
+  <data name="UpdateCheck_Available_Format" xml:space="preserve"><value>✓ Version v{0} available (you have v{1})</value></data>
+  <data name="UpdateCheck_InvalidVersion_Format" xml:space="preserve"><value>Invalid version: '{0}'</value></data>
+  <data name="UpdateCheck_Error_Format" xml:space="preserve"><value>Error: {0}</value></data>
+
+  <!-- Password dialogs -->
+  <data name="Password_Strength_Weak" xml:space="preserve"><value>Weak</value></data>
+  <data name="Password_Strength_Medium" xml:space="preserve"><value>Medium</value></data>
+  <data name="Password_Strength_Good" xml:space="preserve"><value>Good</value></data>
+  <data name="Password_Strength_Strong" xml:space="preserve"><value>Strong</value></data>
+  <data name="Password_Mismatch" xml:space="preserve"><value>Passwords don't match</value></data>
+  <data name="Password_MinLength_Format" xml:space="preserve"><value>Minimum {0} characters ({1} more needed)</value></data>
+  <data name="UnattendedPassword_Incorrect" xml:space="preserve"><value>Incorrect password.</value></data>
+  <data name="UnattendedPassword_IncorrectWithAttempts_Format" xml:space="preserve"><value>Incorrect password. Attempts until lockout: {0}.</value></data>
+  <data name="UnattendedPassword_RememberForContact_Format" xml:space="preserve"><value>Remember password for contact "{0}"</value></data>
+  <data name="UnattendedPassword_LastAttempt" xml:space="preserve"><value>⚠ Incorrect password. Last attempt before lockout.</value></data>
+  <data name="UnattendedPassword_LockoutLifted" xml:space="preserve"><value>✓ Lockout lifted. Close this window and try again.</value></data>
+  <data name="UnattendedPassword_LockoutCountdown_Format" xml:space="preserve"><value>🔒 Too many incorrect attempts. Unlocking in {0}</value></data>
+  <data name="UnattendedPassword_TierHint_Format" xml:space="preserve"><value> (tier {0} — next lockout will be longer)</value></data>
+  <data name="UnattendedPassword_LengthOk" xml:space="preserve"><value>✓ Length sufficient</value></data>
+  <data name="Password_Valid" xml:space="preserve"><value>✓ Password is valid</value></data>
+
+  <!-- Onboarding -->
+  <data name="Onboarding_Step1_Text_Full" xml:space="preserve"><value>Quick 3-step guide. We'll show how to connect to another PC and share your screen.</value></data>
+  <data name="Onboarding_Step2_Title" xml:space="preserve"><value>Create a session</value></data>
+  <data name="Onboarding_Step2_Text" xml:space="preserve"><value>On the "Create session" tab, click the big blue button. Get a login and password — share them with the person who should connect.</value></data>
+  <data name="Onboarding_Step3_Title" xml:space="preserve"><value>Connect to another PC</value></data>
+  <data name="Onboarding_Step3_Text" xml:space="preserve"><value>Or yourself: "Connect" tab → enter the login and password from another user. Done!</value></data>
+  <data name="Onboarding_Step4_Title" xml:space="preserve"><value>Data privacy</value></data>
+  <data name="Onboarding_Step4_Text" xml:space="preserve"><value>The app sends an anonymous heartbeat every 5 minutes (random machine_id, version, country from IP) — for counting active installs. Session content (video, files, input) flows directly between PCs over WebRTC and is not available to the author.</value></data>
+  <data name="Onboarding_Privacy_Open_Link" xml:space="preserve"><value>Open Privacy Policy</value></data>
+  <data name="Onboarding_Privacy_Ack" xml:space="preserve"><value>I have read the Privacy Policy</value></data>
+
+  <!-- Menu / dialogs extra -->
+  <data name="Menu_ClearRecent_Confirm" xml:space="preserve"><value>Clear "Recently connected"? Anonymous sessions ("Session XXXX") will be fully removed, while named contacts are preserved in the address book.</value></data>
+  <data name="Settings_ClearLogs_Confirm" xml:space="preserve"><value>Delete all log files?</value></data>
+  <data name="AddressBook_Remove_Confirm_Format" xml:space="preserve"><value>Delete contact "{0}"?</value></data>
+  <data name="Reconnect_Attempt_Format" xml:space="preserve"><value>Reconnecting ({0}/{1})...</value></data>
+  <data name="About_Build_Format" xml:space="preserve"><value>Build: {0}</value></data>
+  <data name="Time_JustNow" xml:space="preserve"><value>just now</value></data>
+  <data name="Time_Yesterday" xml:space="preserve"><value>yesterday</value></data>
+  <data name="Time_MinutesAgo_Format" xml:space="preserve"><value>{0} min ago</value></data>
+  <data name="Time_HoursAgo_Format" xml:space="preserve"><value>{0} h ago</value></data>
+  <data name="Time_DaysAgo_Format" xml:space="preserve"><value>{0} days ago</value></data>
+  <data name="Time_WeeksAgo_Format" xml:space="preserve"><value>{0} weeks ago</value></data>
+  <data name="Time_MonthsAgo_Format" xml:space="preserve"><value>{0} months ago</value></data>
+
+  <!-- Presence -->
+  <data name="Presence_Online_Tooltip" xml:space="preserve"><value>🟢 Online — host is ready for connection</value></data>
+  <data name="Presence_Offline_Tooltip" xml:space="preserve"><value>🔴 Offline — host doesn't have ZConnect open</value></data>
+  <data name="Presence_Unknown_Tooltip" xml:space="preserve"><value>⚪ Status unknown</value></data>
+
+  <!-- Extra common buttons -->
+  <data name="Button_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Button_Done" xml:space="preserve"><value>Done ✓</value></data>
+  <data name="Button_Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="Error_Title" xml:space="preserve"><value>Error</value></data>
+
+  <!-- Status messages -->
+  <data name="Status_SessionAlreadyExists" xml:space="preserve"><value>Session already exists</value></data>
+  <data name="Status_PasswordRefreshed" xml:space="preserve"><value>Password refreshed</value></data>
+  <data name="Status_NoActiveSession" xml:space="preserve"><value>No active session to refresh</value></data>
+  <data name="Status_WaitingForService" xml:space="preserve"><value>Waiting for service…</value></data>
+  <data name="Status_PasswordRefreshError" xml:space="preserve"><value>Error refreshing session password</value></data>
+  <data name="Status_RemoteScreenOpened" xml:space="preserve"><value>Remote screen window opened</value></data>
+  <data name="Status_InvalidCredentials" xml:space="preserve"><value>Login and password must be exactly 8 digits (0-9)</value></data>
+  <data name="Status_ViewerConnected" xml:space="preserve"><value>Viewer connected</value></data>
+  <data name="Status_ViewerDisconnected" xml:space="preserve"><value>Viewer disconnected</value></data>
+  <data name="Status_ContactNameEmpty" xml:space="preserve"><value>Enter contact name</value></data>
+  <data name="Status_InvalidContactCode" xml:space="preserve"><value>Login and password — exactly 8 digits (0-9)</value></data>
+  <data name="Status_ContactAdded" xml:space="preserve"><value>Contact added</value></data>
+  <data name="Status_ContactModified" xml:space="preserve"><value>Contact modified</value></data>
+  <data name="Status_EditingContact" xml:space="preserve"><value>Editing contact</value></data>
+  <data name="Status_ContactDeleted" xml:space="preserve"><value>Contact deleted</value></data>
+  <data name="Status_SelectContact" xml:space="preserve"><value>Select contact</value></data>
+  <data name="Status_CreatingSession" xml:space="preserve"><value>Creating session...</value></data>
+  <data name="Status_SessionCreated" xml:space="preserve"><value>Session created, waiting for connection</value></data>
+  <data name="Status_CreateSessionError" xml:space="preserve"><value>Session creation error</value></data>
+  <data name="Status_Connecting" xml:space="preserve"><value>Connecting to session...</value></data>
+  <data name="Status_ConnectError" xml:space="preserve"><value>Connection error</value></data>
+  <data name="Status_CopiedLoginPassword" xml:space="preserve"><value>Login and password copied</value></data>
+  <data name="Status_SessionExpired" xml:space="preserve"><value>Session expired</value></data>
+  <data name="Status_SessionExpired_NewRequired" xml:space="preserve"><value>Session is outdated. Create a new session or connect again.</value></data>
+  <data name="Status_Checking" xml:space="preserve"><value>Checking...</value></data>
+  <data name="Status_APIok" xml:space="preserve"><value>API: OK</value></data>
+
+  <!-- Ban / Block / Lock notifications -->
+  <data name="Status_Banned" xml:space="preserve"><value>Your IP is banned on the server. Please contact the administrator.</value></data>
+  <data name="Status_Maintenance" xml:space="preserve"><value>Server is under maintenance. Please try again later.</value></data>
+  <data name="Status_SessionBlocked" xml:space="preserve"><value>Session is blocked due to too many wrong password attempts. Host must refresh the password.</value></data>
+  <data name="Status_SessionLocked_Format" xml:space="preserve"><value>Too many wrong attempts. Please try again in {0} sec.</value></data>
+  <data name="Status_SessionLocked_NoTime" xml:space="preserve"><value>Too many wrong attempts. Session is temporarily locked.</value></data>
+  <data name="Status_NetworkError" xml:space="preserve"><value>No connection to server. Please check your internet.</value></data>
+  <data name="Status_ServerError" xml:space="preserve"><value>Server error. Please try again later.</value></data>
+
+  <data name="Dialog_Title_Blocked" xml:space="preserve"><value>Access blocked</value></data>
+  <data name="Dialog_Title_Maintenance" xml:space="preserve"><value>Maintenance</value></data>
+
+  <!-- Host-side viewer approval dialog -->
+  <data name="Dialog_ViewerApproval_Message" xml:space="preserve"><value>Someone is requesting access to your desktop.
+Allow this connection?</value></data>
+  <data name="Dialog_ViewerApproval_ConfirmButton" xml:space="preserve"><value>Allow</value></data>
+  <data name="Settings_ClearUnattendedPassword_Confirm" xml:space="preserve"><value>Delete local password? Connection without confirmation will no longer work — viewer will always request approval.</value></data>
+
+  <data name="EditContactTitle" xml:space="preserve"><value>Edit contact</value></data>
+  <data name="Status_ViewerDisconnectedReconnecting" xml:space="preserve"><value>Viewer disconnected. Waiting for reconnect...</value></data>
+  <data name="Status_ConnectionLostReconnecting" xml:space="preserve"><value>Connection lost. Waiting for reconnect...</value></data>
+  <data name="Status_ConnectionLostShort" xml:space="preserve"><value>Connection lost, reconnecting...</value></data>
+  <data name="Session_Countdown_HoursFormat" xml:space="preserve"><value>Session: {0}:{1:D2}:{2:D2}</value></data>
+  <data name="Session_Countdown_MinSecFormat" xml:space="preserve"><value>Session: {0:D2}:{1:D2}</value></data>
+  <data name="HostStats_Format" xml:space="preserve"><value>Capture: {0} fps  sent: {1}  dropped: {2:F0}%{3}</value></data>
+
+  <data name="SaveToAddressBook_Title" xml:space="preserve"><value>Save to address book</value></data>
+  <data name="SaveToAddressBook_Message" xml:space="preserve"><value>Give this connection a name (e.g. "Mom's PC", "Office"). After saving it will appear in the address book and replace "Session XXXX" in "Recently connected".</value></data>
+  <data name="Status_ContactSavedFromHistory_Format" xml:space="preserve"><value>"{0}" saved to address book</value></data>
+
+</root>

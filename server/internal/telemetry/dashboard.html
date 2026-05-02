@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZConect Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh;padding:24px}
+h1{font-size:22px;font-weight:600;margin-bottom:16px;color:#58a6ff}
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid #30363d}
+.tab{padding:10px 20px;background:transparent;border:none;color:#8b949e;cursor:pointer;font-size:14px;font-weight:500;border-bottom:2px solid transparent;transition:all 0.2s}
+.tab:hover{color:#e1e4e8}
+.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;text-align:center}
+.card .value{font-size:36px;font-weight:700;margin:8px 0 4px}
+.card .label{font-size:13px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px}
+.card.green .value{color:#3fb950}
+.card.blue .value{color:#58a6ff}
+.card.purple .value{color:#bc8cff}
+.card.gray .value{color:#8b949e}
+.tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:28px}
+.table-wrap{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;overflow:hidden}
+.table-wrap h3{font-size:14px;color:#8b949e;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #21262d}
+th{color:#8b949e;font-weight:500}
+td:last-child{text-align:right;color:#58a6ff;font-weight:600}
+tr:last-child td{border-bottom:none}
+.recent{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px}
+.recent h3{font-size:14px;color:#8b949e;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
+.recent table{font-size:12px}
+.recent td{font-family:'Cascadia Code',Consolas,monospace}
+.recent .ip{color:#8b949e}
+.recent .online{color:#3fb950}
+.recent .offline{color:#484f58}
+.plat-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase}
+.plat-windows{background:#1f3a5f;color:#58a6ff}
+.plat-android{background:#1f4f2a;color:#3fb950}
+.plat-unknown{background:#3a2a1a;color:#d29922}
+.status{font-size:11px;color:#484f58;text-align:right;margin-top:16px}
+.bar{height:6px;background:#21262d;border-radius:3px;margin-top:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:#58a6ff;transition:width 0.5s}
+</style>
+</head>
+<body>
+<h1>ZConect Dashboard</h1>
+
+<div class="tabs">
+  <button class="tab active" data-platform="">All</button>
+  <button class="tab" data-platform="windows">🪟 Windows</button>
+  <button class="tab" data-platform="android">🤖 Android Viewer</button>
+</div>
+
+<div class="cards" id="cards"></div>
+<div class="tables" id="tables"></div>
+<div class="recent" id="recent"></div>
+<div class="status" id="status"></div>
+
+<script>
+const apiKey = new URLSearchParams(location.search).get('key') || '';
+let currentPlatform = '';
+
+function statsUrl() {
+  const params = new URLSearchParams({ key: apiKey });
+  if (currentPlatform) params.set('platform', currentPlatform);
+  return `/api/v1/telemetry/stats?${params.toString()}`;
+}
+
+async function refresh() {
+  try {
+    const r = await fetch(statsUrl());
+    if (!r.ok) { document.getElementById('status').textContent = `Error: ${r.status}`; return; }
+    const d = await r.json();
+    renderCards(d);
+    renderTables(d);
+    renderRecent(d.recent_devices || []);
+    document.getElementById('status').textContent = `Updated: ${new Date().toLocaleTimeString()} · Filter: ${currentPlatform || 'all platforms'}`;
+  } catch(e) {
+    document.getElementById('status').textContent = `Fetch error: ${e.message}`;
+  }
+}
+
+function renderCards(d) {
+  // Active sessions/peers are global, not platform-filtered
+  const showGlobal = !currentPlatform;
+  document.getElementById('cards').innerHTML = `
+    <div class="card green"><div class="label">Online</div><div class="value">${d.online_count}</div></div>
+    ${showGlobal ? `<div class="card blue"><div class="label">Active Sessions</div><div class="value">${d.active_sessions}</div></div>` : ''}
+    ${showGlobal ? `<div class="card blue"><div class="label">Active Peers</div><div class="value">${d.active_peers}</div></div>` : ''}
+    <div class="card purple"><div class="label">Total Installed</div><div class="value">${d.total_installed}</div></div>
+  `;
+}
+
+function renderTables(d) {
+  const sections = [
+    { title: 'OS', data: d.os_distribution },
+    { title: 'Language', data: d.language_distribution },
+    { title: 'Country', data: d.country_distribution },
+    { title: 'App Version', data: d.version_distribution }
+  ];
+  // Add device model table for Android / All
+  if (d.device_model_distribution && d.device_model_distribution.length > 0) {
+    sections.push({ title: 'Android Devices', data: d.device_model_distribution });
+  }
+  const total = d.total_installed || 1;
+  document.getElementById('tables').innerHTML = sections.map(s => {
+    if (!s.data || !s.data.length) return '';
+    const rows = s.data.map(e => {
+      const pct = Math.round(e.count / total * 100);
+      return `<tr><td>${esc(e.label)}</td><td>${e.count}<div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div></td></tr>`;
+    }).join('');
+    return `<div class="table-wrap"><h3>${s.title}</h3><table>${rows}</table></div>`;
+  }).join('');
+}
+
+function renderRecent(devices) {
+  if (!devices.length) { document.getElementById('recent').innerHTML = '<h3>Recent Devices</h3><p style="color:#484f58">No data</p>'; return; }
+  const now = Date.now();
+  const showPlatformCol = !currentPlatform;
+  const rows = devices.map(d => {
+    const ago = timeAgo(d.last_seen);
+    const isOnline = (now - new Date(d.last_seen + 'Z').getTime()) < 10 * 60 * 1000;
+    const dot = isOnline ? '<span class="online">&#9679;</span>' : '<span class="offline">&#9679;</span>';
+    const mid = d.machine_id.length > 12 ? d.machine_id.slice(0,12) + '...' : d.machine_id;
+    const ip = d.ip.length > 15 ? d.ip.slice(0,15) + '...' : d.ip;
+    const plat = d.platform || 'windows'; // empty = legacy Windows
+    const platBadge = `<span class="plat-badge plat-${plat}">${plat}</span>`;
+    const model = d.device_model ? `<div style="font-size:10px;color:#8b949e">${esc(d.device_model)}</div>` : '';
+    const platCell = showPlatformCol ? `<td>${platBadge}</td>` : '';
+    return `<tr><td>${dot}</td>${platCell}<td>${esc(mid)}</td><td>${esc(d.os_version)}${model}</td><td>${esc(d.app_version)}</td><td>${esc(d.country)}</td><td class="ip">${esc(ip)}</td><td>${ago}</td></tr>`;
+  }).join('');
+  const platHeader = showPlatformCol ? '<th>Platform</th>' : '';
+  document.getElementById('recent').innerHTML = `<h3>Recent Devices</h3><table><tr><th></th>${platHeader}<th>Machine</th><th>OS</th><th>Ver</th><th>Country</th><th>IP</th><th>Last Seen</th></tr>${rows}</table>`;
+}
+
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso + 'Z').getTime()) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPlatform = btn.dataset.platform;
+    refresh();
+  });
+});
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>ZConect Admin — Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e1e4e8;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+h1{font-size:20px;font-weight:600;color:#58a6ff;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+h1 .lock{font-size:18px}
+.sub{color:#8b949e;font-size:13px;margin-bottom:22px}
+label{display:block;font-size:12px;color:#8b949e;margin-bottom:6px}
+input[type=password]{width:100%;background:#0f1117;border:1px solid #30363d;border-radius:8px;padding:10px 12px;color:#e1e4e8;font-size:14px;outline:none;transition:border-color .15s}
+input[type=password]:focus{border-color:#58a6ff}
+button{width:100%;background:#238636;border:1px solid #2ea043;color:white;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;margin-top:16px;transition:background .15s}
+button:hover{background:#2ea043}
+button:disabled{background:#484f58;border-color:#30363d;cursor:not-allowed}
+.err{background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px;display:none}
+.err.show{display:block}
+.notice{font-size:11px;color:#484f58;margin-top:18px;text-align:center;line-height:1.5}
+</style>
+</head>
+<body>
+<form class="card" id="f" autocomplete="off">
+  <h1><span class="lock">🔒</span> ZConect Admin</h1>
+  <p class="sub">Введите пароль администратора</p>
+  <label for="pw">Пароль</label>
+  <input type="password" id="pw" autocomplete="current-password" required minlength="8" autofocus>
+  <button type="submit" id="submit">Войти</button>
+  <div class="err" id="err"></div>
+  <p class="notice">Session cookie HttpOnly · Secure · SameSite=Strict.<br>Logout через dashboard menu.</p>
+</form>
+<script>
+const f=document.getElementById('f'),pw=document.getElementById('pw'),err=document.getElementById('err'),btn=document.getElementById('submit');
+f.addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  err.classList.remove('show');
+  btn.disabled=true;btn.textContent='Вход...';
+  try{
+    const r=await fetch('/admin/api/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({password:pw.value}),
+      credentials:'same-origin'
+    });
+    const d=await r.json().catch(()=>({error:'bad response'}));
+    if(r.ok && d.ok){
+      // Redirect to dashboard; CSRF token будет запрошен от /admin/api/session на dashboard load.
+      location.replace('/admin');
+      return;
+    }
+    err.textContent=d.error||('Ошибка '+r.status);
+    err.classList.add('show');
+    pw.value='';pw.focus();
+  }catch(ex){
+    err.textContent='Сетевая ошибка: '+ex.message;
+    err.classList.add('show');
+  }finally{
+    btn.disabled=false;btn.textContent='Войти';
+  }
+});
+</script>
+</body>
+</html>

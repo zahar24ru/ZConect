@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>ZConect Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh;padding:24px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+h1{font-size:22px;font-weight:600;color:#58a6ff}
+.logout{background:transparent;border:1px solid #30363d;color:#8b949e;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s}
+.logout:hover{color:#f85149;border-color:#f85149}
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid #30363d;flex-wrap:wrap}
+.tab{padding:10px 20px;background:transparent;border:none;color:#8b949e;cursor:pointer;font-size:14px;font-weight:500;border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:#e1e4e8}
+.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.page{display:none}
+.page.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;text-align:center}
+.card .value{font-size:32px;font-weight:700;margin:8px 0 4px}
+.card .label{font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+.card.green .value{color:#3fb950}
+.card.blue .value{color:#58a6ff}
+.card.purple .value{color:#bc8cff}
+.card.amber .value{color:#d29922}
+.card.gray .value{color:#8b949e}
+.panel{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;margin-bottom:20px}
+.panel h2{font-size:15px;color:#8b949e;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+.tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:28px}
+.table-wrap{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px}
+.table-wrap h3{font-size:14px;color:#8b949e;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #21262d}
+th{color:#8b949e;font-weight:500}
+td:last-child{text-align:right;color:#58a6ff;font-weight:600}
+tr:last-child td{border-bottom:none}
+.recent table{font-size:12px}
+.recent td{font-family:'Cascadia Code',Consolas,monospace}
+.recent .ip{color:#8b949e}
+.recent .online{color:#3fb950}
+.recent .offline{color:#484f58}
+.plat-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase}
+.plat-windows{background:#1f3a5f;color:#58a6ff}
+.plat-android{background:#1f4f2a;color:#3fb950}
+.plat-unknown{background:#3a2a1a;color:#d29922}
+.status{font-size:11px;color:#484f58;text-align:right;margin-top:16px}
+.bar{height:6px;background:#21262d;border-radius:3px;margin-top:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:#58a6ff;transition:width .5s}
+.form-grid{display:grid;grid-template-columns:140px 1fr;gap:12px 16px;align-items:center;margin-bottom:14px}
+.form-grid label{font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+input[type=text],textarea{width:100%;background:#0f1117;border:1px solid #30363d;border-radius:6px;padding:8px 10px;color:#e1e4e8;font-size:13px;outline:none;font-family:inherit;transition:border-color .15s}
+input[type=text]:focus,textarea:focus{border-color:#58a6ff}
+textarea{min-height:80px;font-family:'Cascadia Code',Consolas,monospace;font-size:12px;resize:vertical}
+.btn{background:#238636;border:1px solid #2ea043;color:white;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn:hover{background:#2ea043}
+.btn:disabled{background:#484f58;border-color:#30363d;cursor:not-allowed}
+.btn.secondary{background:transparent;border-color:#30363d;color:#8b949e}
+.btn.secondary:hover{border-color:#58a6ff;color:#58a6ff;background:transparent}
+.form-result{font-size:12px;padding:8px 12px;border-radius:6px;margin-top:10px;display:none}
+.form-result.show{display:block}
+.form-result.ok{background:rgba(63,185,80,.15);border:1px solid #3fb950;color:#3fb950}
+.form-result.err{background:rgba(248,81,73,.15);border:1px solid #f85149;color:#f85149}
+code{background:#0f1117;padding:2px 6px;border-radius:3px;font-family:'Cascadia Code',Consolas,monospace;font-size:11px;color:#d29922}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>🎛 ZConect Admin</h1>
+  <button class="logout" id="btnLogout">Выйти</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-page="overview">Обзор</button>
+  <button class="tab" data-page="version">Версия клиента</button>
+  <button class="tab" data-page="health">Server Health</button>
+  <button class="tab" data-page="telemetry">Телеметрия</button>
+  <button class="tab" data-page="webrtc">WebRTC сессии</button>
+  <button class="tab" data-page="audit">Аудит</button>
+  <button class="tab" data-page="logs">Логи</button>
+  <button class="tab" data-page="sessions">Admin сессии</button>
+  <button class="tab" data-page="bans">IP блокировки</button>
+  <button class="tab" data-page="suspicious">Подозрительные IP</button>
+  <button class="tab" data-page="password">Пароль</button>
+</div>
+
+<!-- ────── Overview ────── -->
+<div class="page active" id="page-overview">
+  <div class="cards" id="overviewCards"></div>
+  <div class="panel">
+    <h2>Живые метрики</h2>
+    <div id="overviewLive" style="font-size:13px;color:#8b949e;line-height:1.8"></div>
+  </div>
+  <div class="panel">
+    <h2>Управление сервером</h2>
+    <div style="margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="maintenanceToggle" style="width:16px;height:16px;cursor:pointer">
+        <span>Maintenance mode — /api/v1/session/create возвращает 503</span>
+      </label>
+      <input type="text" id="maintenanceMessage" placeholder="Сообщение пользователям (опц.)" style="background:#0f1117;border:1px solid #30363d;color:#e1e4e8;padding:6px 10px;border-radius:6px;width:100%;margin-top:8px;font-size:12px"/>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn secondary" id="btnSaveMaintenance">Применить maintenance</button>
+        <button class="btn secondary" id="btnDownloadDB">Скачать telemetry.db</button>
+      </div>
+    </div>
+    <hr style="border:0;border-top:1px solid #30363d;margin:14px 0">
+    <h2 style="margin-bottom:10px">Действия над admin</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn secondary" id="btnResetRateLimit">Сбросить rate-limit логина</button>
+      <button class="btn secondary" id="btnLogoutAllOthers" style="border-color:#f85149;color:#f85149">Выкинуть всех остальных admin'ов</button>
+    </div>
+    <div class="form-result" id="mgmtResult" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ────── Client Version Manager ────── -->
+<div class="page" id="page-version">
+  <div class="panel">
+    <h2>client-version.json</h2>
+    <div id="versionCurrent" style="margin-bottom:16px;font-size:12px;color:#8b949e"></div>
+    <div class="form-grid">
+      <label for="vLatest">Latest version</label>
+      <input type="text" id="vLatest" placeholder="1.0.1" required>
+      <label for="vUrl">Download URL</label>
+      <input type="text" id="vUrl" placeholder="https://example.com/ZConect-Setup-1.0.1.exe" required>
+      <label for="vNotes">Release notes</label>
+      <textarea id="vNotes" placeholder="- Fix X&#10;- Feature Y"></textarea>
+      <label for="vMin">Min compatible</label>
+      <input type="text" id="vMin" placeholder="1.0.0">
+      <label for="vDate">Published at</label>
+      <input type="text" id="vDate" placeholder="2026-04-21">
+      <label for="vSha">SHA256 (опц.)</label>
+      <input type="text" id="vSha" placeholder="64 hex chars — для integrity verify" maxlength="64" style="font-family:monospace;font-size:11px">
+    </div>
+    <button class="btn" id="btnVersionSave">Сохранить</button>
+    <button class="btn secondary" id="btnVersionReload">Перечитать</button>
+    <div class="form-result" id="versionResult"></div>
+  </div>
+</div>
+
+<!-- ────── Server Health ────── -->
+<div class="page" id="page-health">
+  <div class="cards" id="healthCards"></div>
+  <div class="panel">
+    <h2>Runtime info</h2>
+    <div id="healthDetails" style="font-size:12px;color:#8b949e;font-family:'Cascadia Code',Consolas,monospace;line-height:1.6"></div>
+  </div>
+</div>
+
+<!-- ────── Telemetry (legacy stats) ────── -->
+<div class="page" id="page-telemetry">
+  <div class="tabs" style="margin-top:0">
+    <button class="tab active" data-platform="">All</button>
+    <button class="tab" data-platform="windows">🪟 Windows</button>
+    <button class="tab" data-platform="android">🤖 Android Viewer</button>
+  </div>
+  <div class="cards" id="telemetryCards"></div>
+  <div class="tables" id="telemetryTables"></div>
+  <div class="panel recent" id="telemetryRecent"></div>
+  <div class="status" id="telemetryStatus"></div>
+</div>
+
+<!-- ────── Audit Log ────── -->
+<div class="page" id="page-audit">
+  <div class="panel">
+    <h2>Аудит админ-действий</h2>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn secondary" id="btnAuditRefresh">Обновить</button>
+      <select id="auditLimit" style="background:#0f1117;border:1px solid #30363d;color:#e1e4e8;padding:6px 10px;border-radius:6px">
+        <option value="50">50 последних</option>
+        <option value="100" selected>100 последних</option>
+        <option value="200">200 последних</option>
+        <option value="500">500 последних</option>
+      </select>
+    </div>
+    <div id="auditNote" style="font-size:11px;color:#8b949e;margin-bottom:10px"></div>
+    <div style="overflow-x:auto">
+      <table id="auditTable" style="font-size:12px">
+        <tr>
+          <th>Время</th>
+          <th>IP</th>
+          <th>Действие</th>
+          <th>Результат</th>
+          <th>Причина</th>
+          <th>Метаданные</th>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── Server Logs (categorized viewer 2026-04-27) ────── -->
+<div class="page" id="page-logs">
+  <div class="panel">
+    <h2>Логи сервера</h2>
+
+    <!-- Category chips (quick filters) -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" id="logsCategoryChips">
+      <button class="logcat-chip" data-cat="" style="background:#1f2937;border:1px solid #30363d;color:#e1e4e8;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">Все <span class="cat-count" data-cat-count="all">—</span></button>
+      <button class="logcat-chip" data-cat="sessions" style="background:#0f1117;border:1px solid #30363d;color:#8b949e;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">🟢 Сессии <span class="cat-count" data-cat-count="sessions">—</span></button>
+      <button class="logcat-chip" data-cat="websocket" style="background:#0f1117;border:1px solid #30363d;color:#8b949e;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">🔌 WebSocket <span class="cat-count" data-cat-count="websocket">—</span></button>
+      <button class="logcat-chip" data-cat="auth" style="background:#0f1117;border:1px solid #30363d;color:#8b949e;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">🔐 Auth <span class="cat-count" data-cat-count="auth">—</span></button>
+      <button class="logcat-chip" data-cat="security" style="background:#0f1117;border:1px solid #30363d;color:#8b949e;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">🛡️ Security <span class="cat-count" data-cat-count="security">—</span></button>
+      <button class="logcat-chip" data-cat="telemetry" style="background:#0f1117;border:1px solid #30363d;color:#8b949e;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">📊 Telemetry <span class="cat-count" data-cat-count="telemetry">—</span></button>
+      <button class="logcat-chip" data-cat="issues" style="background:#0f1117;border:1px solid #30363d;color:#f85149;padding:6px 12px;border-radius:14px;font-size:12px;cursor:pointer;transition:all 0.15s">⚠️ WARN/ERROR <span class="cat-count" data-cat-count="issues">—</span></button>
+    </div>
+
+    <!-- Controls row -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <button class="btn secondary" id="btnLogsRefresh">Обновить</button>
+      <input id="logsSearch" type="text" placeholder="🔎 поиск по session_id / IP / peer_id / тексту…"
+             style="background:#0f1117;border:1px solid #30363d;color:#e1e4e8;padding:6px 12px;border-radius:6px;flex:1;min-width:240px;font-size:12px" />
+      <select id="logsLines" style="background:#0f1117;border:1px solid #30363d;color:#e1e4e8;padding:6px 10px;border-radius:6px">
+        <option value="100" selected>100 строк</option>
+        <option value="300">300 строк</option>
+        <option value="500">500 строк</option>
+        <option value="1000">1000 строк</option>
+      </select>
+      <select id="logsLevel" style="background:#0f1117;border:1px solid #30363d;color:#e1e4e8;padding:6px 10px;border-radius:6px">
+        <option value="">Все уровни</option>
+        <option value="DEBUG">DEBUG</option>
+        <option value="INFO">INFO</option>
+        <option value="WARN">WARN</option>
+        <option value="ERROR">ERROR</option>
+      </select>
+      <label style="font-size:11px;color:#8b949e;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="logsAutoRefresh" style="margin:0" /> авто-обновление 5с
+      </label>
+    </div>
+
+    <div id="logsNote" style="font-size:11px;color:#8b949e;margin-bottom:10px"></div>
+
+    <!-- Structured table view -->
+    <div id="logsTableWrapper" style="background:#0f1117;border-radius:6px;overflow:auto;max-height:600px">
+      <table id="logsTable" style="width:100%;border-collapse:collapse;font-family:'Cascadia Code',Consolas,monospace;font-size:11px;color:#c9d1d9">
+        <thead style="position:sticky;top:0;background:#1f2937;z-index:1">
+          <tr>
+            <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #30363d;font-weight:600;color:#8b949e;white-space:nowrap">Время</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #30363d;font-weight:600;color:#8b949e">Уровень</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #30363d;font-weight:600;color:#8b949e">Модуль</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #30363d;font-weight:600;color:#8b949e">Событие</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #30363d;font-weight:600;color:#8b949e">Сообщение / Контекст</th>
+          </tr>
+        </thead>
+        <tbody id="logsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WebRTC Sessions (active host-viewer pairs) ────── -->
+<div class="page" id="page-webrtc">
+  <div class="panel">
+    <h2>Активные WebRTC сессии</h2>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn secondary" id="btnWebRTCRefresh">Обновить</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="webrtcTable" style="font-size:12px">
+        <tr>
+          <th>Session ID</th>
+          <th>Login</th>
+          <th>State</th>
+          <th>Создана</th>
+          <th>Истекает</th>
+          <th title="Общее количество неуспешных попыток ввести пароль за всю жизнь сессии. Ресетится только при успешном join или password refresh.">Неуд. всего</th>
+          <th title="Уровень прогрессивной блокировки: 0=нет, 1=15с lock, 2=2мин, 3=15мин, 4=1ч, 5=BLOCKED permanent (требует password refresh от host'а). Ресетится при успешном join или refresh.">Tier</th>
+          <th title="Текущий lock: осталось секунд до разблокировки или «BLOCKED» для permanent.">Lock</th>
+          <th></th>
+        </tr>
+      </table>
+    </div>
+    <div id="webrtcNote" style="font-size:11px;color:#8b949e;margin-top:10px">
+      Сессии с tier ≥ 2 подсвечены жёлтым (подозрение на брутфорс), BLOCKED — красным.
+      Permanent block снимается только через password refresh от host'а.
+    </div>
+  </div>
+</div>
+
+<!-- ────── IP Bans ────── -->
+<div class="page" id="page-bans">
+  <div class="panel">
+    <h2>IP блокировки</h2>
+    <div class="form-grid" style="margin-bottom:14px">
+      <label for="banIp">IP адрес</label>
+      <input type="text" id="banIp" placeholder="1.2.3.4"/>
+      <label for="banReason">Причина</label>
+      <input type="text" id="banReason" placeholder="spam / abuse / brute force"/>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn" id="btnBanAdd">Забанить IP</button>
+      <button class="btn secondary" id="btnBanRefresh">Обновить список</button>
+    </div>
+    <div class="form-result" id="banResult" style="margin-top:10px"></div>
+    <hr style="border:0;border-top:1px solid #30363d;margin:14px 0">
+    <h3 style="font-size:13px;color:#8b949e;margin-bottom:10px;text-transform:uppercase">Забаненные IP</h3>
+    <table id="bansTable" style="font-size:12px">
+      <tr><th>IP</th><th>Причина</th><th>Создано</th><th></th></tr>
+    </table>
+    <div id="bansNote" style="font-size:11px;color:#8b949e;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ────── Suspicious IPs (enumeration detector) ────── -->
+<div class="page" id="page-suspicious">
+  <div class="panel">
+    <h2>Подозрительные IP</h2>
+    <p style="font-size:12px;color:#8b949e;margin-bottom:14px">
+      IP адреса которые делают много неуспешных <code>/api/v1/session/join</code> попыток
+      в последние <span id="susWindowLabel">5 минут</span>.
+      Типичный паттерн брутфорса — множественные попытки с разными login_codes
+      (attacker не знает валидный → перебирает). Per-session lockout не срабатывает
+      в таком сценарии т.к. login_code не матчит ни одну сессию.
+      <br><br>
+      <strong>Реагировать</strong>: проверить в логах pattern (intervals, User-Agent),
+      при уверенности — добавить в IP блокировки вкладке рядом.
+      Автобан НЕ делается — NAT/мобильные сети могут иметь много legitimate users за одним IP.
+    </p>
+    <div style="display:flex;gap:10px;margin-bottom:10px">
+      <label style="font-size:12px;color:#8b949e;align-self:center">Показать от <span id="susMinLabel">5</span> попыток:</label>
+      <select id="susMinSelect" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;font-size:12px">
+        <option value="1">1+</option>
+        <option value="3">3+</option>
+        <option value="5" selected>5+</option>
+        <option value="10">10+</option>
+        <option value="20">20+</option>
+      </select>
+      <button class="btn secondary" id="btnSusRefresh">Обновить</button>
+    </div>
+    <table id="suspiciousTable" style="font-size:12px">
+      <tr>
+        <th>IP</th>
+        <th title="Количество неуспешных /join за окно">Попыток</th>
+        <th>Первая</th>
+        <th>Последняя</th>
+        <th>Действие</th>
+      </tr>
+    </table>
+    <div id="susNote" style="font-size:11px;color:#8b949e;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ────── Change Password ────── -->
+<div class="page" id="page-password">
+  <div class="panel">
+    <h2>Смена admin пароля</h2>
+    <div class="form-grid" style="margin-bottom:14px">
+      <label for="pwOld">Старый пароль</label>
+      <input type="text" id="pwOld"/>
+      <label for="pwNew">Новый пароль</label>
+      <input type="text" id="pwNew"/>
+      <label for="pwNew2">Повтор нового</label>
+      <input type="text" id="pwNew2"/>
+    </div>
+    <button class="btn" id="btnChangePassword">Сменить пароль</button>
+    <div class="form-result" id="pwResult" style="margin-top:10px"></div>
+    <p style="font-size:11px;color:#8b949e;margin-top:14px;line-height:1.6">
+      Новый hash сохраняется в <code>/app/data/admin-password.hash</code> (Docker volume
+      signaling-data — переживает restart контейнера). В текущей сессии продолжаешь
+      работать; login по старому паролю сразу перестаёт работать.
+    </p>
+  </div>
+</div>
+
+<!-- ────── Admin Sessions ────── -->
+<div class="page" id="page-sessions">
+  <div class="panel">
+    <h2>Активные admin-сессии</h2>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn secondary" id="btnSessionsRefresh">Обновить</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="sessionsTable" style="font-size:12px">
+        <tr>
+          <th>ID (prefix)</th>
+          <th>IP</th>
+          <th>Создана</th>
+          <th>Последняя активность</th>
+          <th></th>
+        </tr>
+      </table>
+    </div>
+    <div id="sessionsNote" style="font-size:11px;color:#8b949e;margin-top:10px"></div>
+  </div>
+</div>
+
+<script>
+// ── CSRF token — fetched once on load from /admin/api/session ─────────────
+let csrfToken = '';
+let currentPlatform = '';
+let refreshTimer = null;
+
+async function loadCSRF(){
+  try{
+    const r=await fetch('/admin/api/session',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok){location.replace('/admin/login');return false;}
+    const d=await r.json();
+    csrfToken=d.csrf_token||'';
+    return true;
+  }catch{location.replace('/admin/login');return false;}
+}
+
+// ── Page routing ─────────────────────────────────────────────────
+const pages=document.querySelectorAll('.page');
+const tabs=document.querySelectorAll('.tabs > .tab[data-page]');
+tabs.forEach(btn=>btn.addEventListener('click',()=>{
+  tabs.forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const pg=btn.dataset.page;
+  pages.forEach(p=>p.classList.toggle('active',p.id==='page-'+pg));
+  onPageChange(pg);
+}));
+
+function onPageChange(pg){
+  if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
+  if(pg==='overview'){refreshOverview();refreshTimer=setInterval(refreshOverview,10000);}
+  else if(pg==='health'){refreshHealth();refreshTimer=setInterval(refreshHealth,10000);}
+  else if(pg==='telemetry'){refreshTelemetry();refreshTimer=setInterval(refreshTelemetry,30000);}
+  else if(pg==='version'){loadVersion();}
+  else if(pg==='webrtc'){refreshWebRTC();refreshTimer=setInterval(refreshWebRTC,15000);}
+  else if(pg==='audit'){if(typeof refreshAudit==='function')refreshAudit();}
+  else if(pg==='logs'){if(typeof refreshLogs==='function')refreshLogs();}
+  else if(pg==='sessions'){if(typeof refreshAdminSessions==='function')refreshAdminSessions();}
+  else if(pg==='bans'){refreshBans();}
+  else if(pg==='suspicious'){refreshSuspiciousIPs();refreshTimer=setInterval(refreshSuspiciousIPs,15000);}
+}
+
+// ── Overview ─────────────────────────────────────────────────
+async function refreshOverview(){
+  try{
+    const r=await fetch('/admin/api/health',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok)return;
+    const d=await r.json();
+    document.getElementById('overviewCards').innerHTML=`
+      <div class="card green"><div class="label">Active Sessions</div><div class="value">${d.active_sessions}</div></div>
+      <div class="card blue"><div class="label">Active Peers</div><div class="value">${d.active_peers}</div></div>
+      <div class="card purple"><div class="label">Rooms</div><div class="value">${d.active_rooms}</div></div>
+      <div class="card amber"><div class="label">Admin Sessions</div><div class="value">${d.admin_sessions}</div></div>
+    `;
+    const uptimeStr=fmtDuration(d.uptime_seconds);
+    document.getElementById('overviewLive').innerHTML=`
+      Uptime: <code>${uptimeStr}</code><br>
+      Started at: <code>${d.started_at}</code><br>
+      Go version: <code>${d.go_version}</code>
+    `;
+  }catch(e){}
+}
+
+// ── Server Health (more detail) ─────────────────────────────────────────
+async function refreshHealth(){
+  try{
+    const r=await fetch('/admin/api/health',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok)return;
+    const d=await r.json();
+    document.getElementById('healthCards').innerHTML=`
+      <div class="card blue"><div class="label">Uptime</div><div class="value">${fmtDurationShort(d.uptime_seconds)}</div></div>
+      <div class="card green"><div class="label">Goroutines</div><div class="value">${d.goroutines}</div></div>
+      <div class="card purple"><div class="label">Heap</div><div class="value">${fmtBytes(d.heap_alloc_bytes)}</div></div>
+      <div class="card amber"><div class="label">Sys Mem</div><div class="value">${fmtBytes(d.sys_bytes)}</div></div>
+    `;
+    document.getElementById('healthDetails').innerHTML=`
+started_at       ${d.started_at}<br>
+uptime_seconds   ${d.uptime_seconds}<br>
+goroutines       ${d.goroutines}<br>
+heap_alloc_bytes ${d.heap_alloc_bytes.toLocaleString()}<br>
+sys_bytes        ${d.sys_bytes.toLocaleString()}<br>
+active_sessions  ${d.active_sessions}<br>
+active_peers     ${d.active_peers}<br>
+active_rooms     ${d.active_rooms}<br>
+admin_sessions   ${d.admin_sessions}<br>
+go_version       ${d.go_version}`;
+  }catch(e){}
+}
+
+// ── Version Manager ─────────────────────────────────────────────────
+async function loadVersion(){
+  try{
+    const r=await fetch('/admin/api/version',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    const d=await r.json();
+    const el=document.getElementById('versionCurrent');
+    if(!d.exists){
+      el.innerHTML='Файл <code>client-version.json</code> не найден. Заполните форму и нажмите «Сохранить» — он будет создан.';
+      return;
+    }
+    const i=d.info||{};
+    el.innerHTML='Текущее: <code>'+(i.latest_version||'')+'</code> · <code>'+(i.published_at||'')+'</code>';
+    document.getElementById('vLatest').value=i.latest_version||'';
+    document.getElementById('vUrl').value=i.download_url||'';
+    document.getElementById('vNotes').value=i.release_notes||'';
+    document.getElementById('vMin').value=i.min_compatible_version||'';
+    document.getElementById('vDate').value=i.published_at||'';
+    document.getElementById('vSha').value=i.sha256||'';
+  }catch(e){
+    document.getElementById('versionCurrent').textContent='Ошибка загрузки: '+e.message;
+  }
+}
+
+document.getElementById('btnVersionReload').addEventListener('click',loadVersion);
+document.getElementById('btnVersionSave').addEventListener('click',async()=>{
+  const res=document.getElementById('versionResult');
+  res.className='form-result';res.textContent='';
+  const body={
+    latest_version:document.getElementById('vLatest').value.trim(),
+    download_url:document.getElementById('vUrl').value.trim(),
+    release_notes:document.getElementById('vNotes').value,
+    min_compatible_version:document.getElementById('vMin').value.trim(),
+    published_at:document.getElementById('vDate').value.trim(),
+    sha256:document.getElementById('vSha').value.trim().toLowerCase(),
+  };
+  if(!body.latest_version||!body.download_url){
+    res.className='form-result err show';res.textContent='latest_version и download_url обязательны';return;
+  }
+  try{
+    const r=await fetch('/admin/api/version',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-Token':csrfToken},
+      body:JSON.stringify(body)
+    });
+    const txt=await r.text();
+    if(r.ok){
+      res.className='form-result ok show';
+      res.textContent='✓ Сохранено. Клиенты увидят обновление в течение 30с (server cache TTL).';
+      loadVersion();
+    }else{
+      res.className='form-result err show';
+      res.textContent='Ошибка '+r.status+': '+txt;
+    }
+  }catch(e){
+    res.className='form-result err show';res.textContent='Сетевая ошибка: '+e.message;
+  }
+});
+
+// ── Telemetry (legacy stats) ─────────────────────────────────────────
+document.querySelectorAll('#page-telemetry .tab[data-platform]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('#page-telemetry .tab[data-platform]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPlatform=btn.dataset.platform;
+  refreshTelemetry();
+}));
+
+async function refreshTelemetry(){
+  try{
+    const url='/api/v1/telemetry/stats'+(currentPlatform?'?platform='+currentPlatform:'');
+    const r=await fetch(url,{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok){document.getElementById('telemetryStatus').textContent='Error: '+r.status;return;}
+    const d=await r.json();
+    renderTelemetryCards(d);renderTelemetryTables(d);renderTelemetryRecent(d.recent_devices||[]);
+    document.getElementById('telemetryStatus').textContent='Updated: '+new Date().toLocaleTimeString();
+  }catch(e){document.getElementById('telemetryStatus').textContent='Fetch error: '+e.message;}
+}
+function renderTelemetryCards(d){
+  const showGlobal=!currentPlatform;
+  document.getElementById('telemetryCards').innerHTML=`
+    <div class="card green"><div class="label">Online</div><div class="value">${d.online_count}</div></div>
+    ${showGlobal?`<div class="card blue"><div class="label">Active Sessions</div><div class="value">${d.active_sessions}</div></div>`:''}
+    ${showGlobal?`<div class="card blue"><div class="label">Active Peers</div><div class="value">${d.active_peers}</div></div>`:''}
+    <div class="card purple"><div class="label">Total Installed</div><div class="value">${d.total_installed}</div></div>
+  `;
+}
+function renderTelemetryTables(d){
+  const sections=[
+    {title:'OS',data:d.os_distribution},
+    {title:'Language',data:d.language_distribution},
+    {title:'Country',data:d.country_distribution},
+    {title:'App Version',data:d.version_distribution}
+  ];
+  if(d.device_model_distribution&&d.device_model_distribution.length>0){
+    sections.push({title:'Android Devices',data:d.device_model_distribution});
+  }
+  const total=d.total_installed||1;
+  document.getElementById('telemetryTables').innerHTML=sections.map(s=>{
+    if(!s.data||!s.data.length)return '';
+    const rows=s.data.map(e=>{
+      const pct=Math.round(e.count/total*100);
+      return `<tr><td>${esc(e.label)}</td><td>${e.count}<div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div></td></tr>`;
+    }).join('');
+    return `<div class="table-wrap"><h3>${s.title}</h3><table>${rows}</table></div>`;
+  }).join('');
+}
+function renderTelemetryRecent(devices){
+  if(!devices.length){document.getElementById('telemetryRecent').innerHTML='<h2>Recent Devices</h2><p style="color:#484f58">Нет данных</p>';return;}
+  const now=Date.now();
+  const showPlat=!currentPlatform;
+  const rows=devices.map(d=>{
+    const ago=timeAgo(d.last_seen);
+    const isOnline=(now-new Date(d.last_seen+'Z').getTime())<10*60*1000;
+    const dot=isOnline?'<span class="online">&#9679;</span>':'<span class="offline">&#9679;</span>';
+    const mid=(d.machine_id||'').length>12?d.machine_id.slice(0,12)+'...':d.machine_id;
+    const ip=(d.ip||'').length>15?d.ip.slice(0,15)+'...':d.ip;
+    const plat=d.platform||'windows';
+    const platBadge=`<span class="plat-badge plat-${plat}">${plat}</span>`;
+    const model=d.device_model?`<div style="font-size:10px;color:#8b949e">${esc(d.device_model)}</div>`:'';
+    const platCell=showPlat?`<td>${platBadge}</td>`:'';
+    return `<tr><td>${dot}</td>${platCell}<td>${esc(mid)}</td><td>${esc(d.os_version)}${model}</td><td>${esc(d.app_version)}</td><td>${esc(d.country)}</td><td class="ip">${esc(ip)}</td><td>${ago}</td></tr>`;
+  }).join('');
+  const platHeader=showPlat?'<th>Platform</th>':'';
+  document.getElementById('telemetryRecent').innerHTML=`<h2>Recent Devices</h2><table><tr><th></th>${platHeader}<th>Machine</th><th>OS</th><th>Ver</th><th>Country</th><th>IP</th><th>Last Seen</th></tr>${rows}</table>`;
+}
+
+function timeAgo(iso){const s=Math.floor((Date.now()-new Date(iso+'Z').getTime())/1000);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';if(b<1073741824)return (b/1048576).toFixed(1)+' MB';return (b/1073741824).toFixed(2)+' GB';}
+function fmtDuration(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sec=s%60;const parts=[];if(d)parts.push(d+'d');if(h)parts.push(h+'h');if(m)parts.push(m+'m');parts.push(sec+'s');return parts.join(' ');}
+function fmtDurationShort(s){if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';}
+
+// ── Logout ─────────────────────────────────────────────────
+document.getElementById('btnLogout').addEventListener('click',async()=>{
+  try{
+    await fetch('/admin/api/logout',{
+      method:'POST',credentials:'same-origin',
+      headers:{'X-CSRF-Token':csrfToken,'Accept':'application/json'}
+    });
+  }catch{}
+  location.replace('/admin/login');
+});
+
+// ── Overview mgmt buttons ─────────────────────────────────────────
+function showMgmt(msg, isErr){
+  const el=document.getElementById('mgmtResult');
+  el.className='form-result '+(isErr?'err':'ok')+' show';
+  el.textContent=msg;
+  setTimeout(()=>el.classList.remove('show'),5000);
+}
+
+document.getElementById('btnResetRateLimit').addEventListener('click',async()=>{
+  if(!confirm('Сбросить rate-limit для всех IP? Все заблокированные смогут снова пытаться login.'))return;
+  try{
+    const r=await fetch('/admin/api/ratelimit/reset',{
+      method:'POST',credentials:'same-origin',
+      headers:{'X-CSRF-Token':csrfToken,'Accept':'application/json'}
+    });
+    const d=await r.json();
+    if(r.ok){showMgmt('✓ Rate-limit сброшен. Очищено IP: '+d.cleared_ips);}
+    else {showMgmt('Ошибка: '+(d.error||r.status), true);}
+  }catch(e){showMgmt('Сетевая ошибка: '+e.message, true);}
+});
+
+document.getElementById('btnLogoutAllOthers').addEventListener('click',async()=>{
+  if(!confirm('Вы уверены? Все остальные admin-сессии будут убиты (они увидят login form при следующем действии).'))return;
+  try{
+    const r=await fetch('/admin/api/sessions/logout-all',{
+      method:'POST',credentials:'same-origin',
+      headers:{'X-CSRF-Token':csrfToken,'Accept':'application/json'}
+    });
+    const d=await r.json();
+    if(r.ok){showMgmt('✓ Остальные сессии убиты: '+d.killed_sessions);}
+    else {showMgmt('Ошибка: '+(d.error||r.status), true);}
+  }catch(e){showMgmt('Сетевая ошибка: '+e.message, true);}
+});
+
+// ── Maintenance mode ─────────────────────────────────────────────────
+async function loadMaintenance(){
+  try{
+    const r=await fetch('/admin/api/maintenance',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    const d=await r.json();
+    document.getElementById('maintenanceToggle').checked=!!d.enabled;
+    document.getElementById('maintenanceMessage').value=d.message||'';
+  }catch{}
+}
+document.getElementById('btnSaveMaintenance').addEventListener('click',async()=>{
+  const enabled=document.getElementById('maintenanceToggle').checked;
+  const message=document.getElementById('maintenanceMessage').value;
+  try{
+    const r=await fetch('/admin/api/maintenance',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+      body:JSON.stringify({enabled:enabled,message:message})
+    });
+    if(r.ok){showMgmt('✓ Maintenance mode: '+(enabled?'ВКЛ':'ВЫКЛ'));}
+    else{showMgmt('Ошибка '+r.status, true);}
+  }catch(e){showMgmt('Сетевая ошибка: '+e.message, true);}
+});
+
+// ── DB backup download ─────────────────────────────────────────────────
+document.getElementById('btnDownloadDB').addEventListener('click',()=>{
+  // Используем iframe/location для скачивания бинарника.
+  // Cookie отошлётся с запросом (same-origin).
+  window.location.href='/admin/api/backup/db';
+});
+
+// ── WebRTC sessions ─────────────────────────────────────────────────
+async function refreshWebRTC(){
+  try{
+    const r=await fetch('/admin/api/webrtc-sessions',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    const d=await r.json();
+    const tbl=document.getElementById('webrtcTable');
+    tbl.innerHTML='<tr><th>Session ID</th><th>Login</th><th>State</th><th>Создана</th><th>Истекает</th><th title="Общее количество неуспешных попыток за всю жизнь сессии">Неуд. всего</th><th title="Уровень прогрессивной блокировки: 0=нет, 1=15с, 2=2мин, 3=15мин, 4=1ч, 5=BLOCKED">Tier</th><th title="Осталось секунд до разблокировки">Lock</th><th></th></tr>';
+    const nowSec=Math.floor(Date.now()/1000);
+    for(const s of (d.sessions||[])){
+      const shortId=s.id.length>12?s.id.slice(0,12)+'...':s.id;
+      const created=new Date(s.created_at).toLocaleString();
+      const expires=new Date(s.expires_at).toLocaleString();
+      const totalFails=s.total_failed_attempts||0;
+      const tier=s.lockout_tier||0;
+      // Lock column: BLOCKED permanent (красн), временный lock с countdown (жёлт), иначе пусто.
+      let lockCell='';
+      if(s.state==='BLOCKED'){lockCell='<span style="color:#f85149;font-weight:bold">BLOCKED</span>';}
+      else if(s.locked_until_unix_sec && s.locked_until_unix_sec>nowSec){
+        const rem=s.locked_until_unix_sec-nowSec;
+        const mm=Math.floor(rem/60), ss=rem%60;
+        lockCell='<span style="color:#d29922">'+(mm>0?mm+'м ':'')+ss+'с</span>';
+      }
+      // Row background по tier: blocked=red tint, tier>=2=yellow tint, иначе default
+      let rowStyle='';
+      if(s.state==='BLOCKED'){rowStyle='style="background:#4a1f1f"';}
+      else if(tier>=2){rowStyle='style="background:#3a321a"';}
+      // Tier coloring (text)
+      let tierCell=''+tier;
+      if(tier>=2 && tier<=4){tierCell='<span style="color:#d29922;font-weight:bold">'+tier+'</span>';}
+      else if(tier>=5){tierCell='<span style="color:#f85149;font-weight:bold">'+tier+' (blocked)</span>';}
+      // Total fails coloring
+      let failsCell=''+totalFails;
+      if(totalFails>=10){failsCell='<span style="color:#f85149;font-weight:bold">'+totalFails+'</span>';}
+      else if(totalFails>=5){failsCell='<span style="color:#d29922">'+totalFails+'</span>';}
+      tbl.innerHTML+='<tr '+rowStyle+'><td style="font-family:monospace;font-size:10px">'+esc(shortId)+'</td><td>'+esc(s.login_code)+'</td><td>'+esc(s.state)+'</td><td>'+esc(created)+'</td><td>'+esc(expires)+'</td><td>'+failsCell+'</td><td>'+tierCell+'</td><td>'+lockCell+'</td><td><button class="btn secondary" style="font-size:10px;padding:3px 8px;border-color:#f85149;color:#f85149" data-kill="'+esc(s.id)+'">Kill</button></td></tr>';
+    }
+    document.getElementById('webrtcNote').textContent='Активных сессий: '+(d.count||0)+(d.note?' — '+d.note:'');
+    // Wire kill buttons
+    tbl.querySelectorAll('[data-kill]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const sid=btn.dataset.kill;
+      if(!confirm('Убить session '+sid+'?'))return;
+      try{
+        const r=await fetch('/admin/api/webrtc-sessions/kill',{
+          method:'POST',credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+          body:JSON.stringify({session_id:sid})
+        });
+        const d=await r.json();
+        if(r.ok && d.ok){refreshWebRTC();}
+        else{alert('Не удалось убить session');}
+      }catch(e){alert('Ошибка: '+e.message);}
+    }));
+  }catch(e){document.getElementById('webrtcNote').textContent='Ошибка: '+e.message;}
+}
+document.getElementById('btnWebRTCRefresh').addEventListener('click',refreshWebRTC);
+
+// ── IP bans ─────────────────────────────────────────────────
+async function refreshBans(){
+  try{
+    const r=await fetch('/admin/api/ban/list',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    const d=await r.json();
+    const tbl=document.getElementById('bansTable');
+    tbl.innerHTML='<tr><th>IP</th><th>Причина</th><th>Создано</th><th></th></tr>';
+    for(const b of (d.bans||[])){
+      const created=new Date(b.created_at).toLocaleString();
+      tbl.innerHTML+='<tr><td class="ip">'+esc(b.ip)+'</td><td>'+esc(b.reason||'')+'</td><td>'+esc(created)+'</td><td><button class="btn secondary" style="font-size:10px;padding:3px 8px" data-unban="'+esc(b.ip)+'">Unban</button></td></tr>';
+    }
+    document.getElementById('bansNote').textContent='Забанено IP: '+(d.count||0);
+    tbl.querySelectorAll('[data-unban]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const ip=btn.dataset.unban;
+      try{
+        await fetch('/admin/api/ban',{
+          method:'POST',credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+          body:JSON.stringify({ip:ip,action:'remove'})
+        });
+        refreshBans();
+      }catch(e){alert(e.message);}
+    }));
+  }catch(e){document.getElementById('bansNote').textContent='Ошибка: '+e.message;}
+}
+document.getElementById('btnBanRefresh').addEventListener('click',refreshBans);
+
+// ── Suspicious IPs (enumeration detector) ───────────────────────────
+async function refreshSuspiciousIPs(){
+  const min=parseInt(document.getElementById('susMinSelect').value||'5',10);
+  document.getElementById('susMinLabel').textContent=min;
+  try{
+    const r=await fetch('/admin/api/suspicious-ips?min='+min,{credentials:'same-origin',headers:{Accept:'application/json'}});
+    const d=await r.json();
+    if(d.window_sec){
+      const mins=Math.round(d.window_sec/60);
+      document.getElementById('susWindowLabel').textContent=mins+' минут';
+    }
+    const tbl=document.getElementById('suspiciousTable');
+    tbl.innerHTML='<tr><th>IP</th><th>Попыток</th><th>Первая</th><th>Последняя</th><th>Действие</th></tr>';
+    const ips=d.ips||[];
+    for(const s of ips){
+      const first=new Date(s.first_seen).toLocaleTimeString();
+      const last=new Date(s.last_seen).toLocaleTimeString();
+      // Color coding по threshold: 5-9 yellow, 10-19 orange, 20+ red
+      let countStyle='';
+      if(s.count>=20) countStyle='color:#f85149;font-weight:bold';
+      else if(s.count>=10) countStyle='color:#ff8c42;font-weight:bold';
+      else if(s.count>=5) countStyle='color:#d29922';
+      tbl.innerHTML+='<tr><td class="ip">'+esc(s.ip)+'</td>'
+        +'<td style="'+countStyle+'">'+s.count+'</td>'
+        +'<td>'+first+'</td><td>'+last+'</td>'
+        +'<td><button class="btn secondary" style="font-size:10px;padding:3px 8px;border-color:#f85149;color:#f85149" data-ban-sus="'+esc(s.ip)+'">Забанить</button></td></tr>';
+    }
+    const note=d.note?' ('+d.note+')':'';
+    document.getElementById('susNote').textContent='Найдено подозрительных: '+ips.length+note;
+    // Wire "Забанить" кнопки — pre-fill IP в ban form и переключить на вкладку bans.
+    tbl.querySelectorAll('[data-ban-sus]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const ip=btn.dataset.banSus;
+      if(!confirm('Забанить IP '+ip+' за подозрительную активность?'))return;
+      try{
+        const r=await fetch('/admin/api/ban',{
+          method:'POST',credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+          body:JSON.stringify({ip:ip,reason:'suspicious: enumeration attack',action:'add'})
+        });
+        if(r.ok){refreshSuspiciousIPs();refreshBans();}
+        else{alert('Ошибка '+r.status);}
+      }catch(e){alert(e.message);}
+    }));
+  }catch(e){document.getElementById('susNote').textContent='Ошибка: '+e.message;}
+}
+document.getElementById('btnSusRefresh').addEventListener('click',refreshSuspiciousIPs);
+document.getElementById('susMinSelect').addEventListener('change',refreshSuspiciousIPs);
+
+document.getElementById('btnBanAdd').addEventListener('click',async()=>{
+  const ip=document.getElementById('banIp').value.trim();
+  const reason=document.getElementById('banReason').value.trim();
+  const res=document.getElementById('banResult');
+  if(!ip){res.className='form-result err show';res.textContent='IP обязателен';return;}
+  try{
+    const r=await fetch('/admin/api/ban',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+      body:JSON.stringify({ip:ip,reason:reason,action:'add'})
+    });
+    if(r.ok){
+      res.className='form-result ok show';res.textContent='✓ IP '+ip+' забанен';
+      document.getElementById('banIp').value='';document.getElementById('banReason').value='';
+      refreshBans();
+    }else{res.className='form-result err show';res.textContent='Ошибка '+r.status;}
+  }catch(e){res.className='form-result err show';res.textContent='Ошибка: '+e.message;}
+});
+
+// ── Change password ─────────────────────────────────────────────────
+document.getElementById('btnChangePassword').addEventListener('click',async()=>{
+  const old=document.getElementById('pwOld').value;
+  const nw=document.getElementById('pwNew').value;
+  const nw2=document.getElementById('pwNew2').value;
+  const res=document.getElementById('pwResult');
+  if(!old||!nw){res.className='form-result err show';res.textContent='Заполните оба поля';return;}
+  if(nw!==nw2){res.className='form-result err show';res.textContent='Новые пароли не совпадают';return;}
+  if(nw.length<8){res.className='form-result err show';res.textContent='Пароль должен быть ≥ 8 символов';return;}
+  try{
+    const r=await fetch('/admin/api/password',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken,'Accept':'application/json'},
+      body:JSON.stringify({old:old,new:nw})
+    });
+    const d=await r.json();
+    if(r.ok && d.ok){
+      res.className='form-result ok show';res.textContent='✓ Пароль изменён. Старый больше не работает.';
+      document.getElementById('pwOld').value='';document.getElementById('pwNew').value='';document.getElementById('pwNew2').value='';
+    }else{res.className='form-result err show';res.textContent=(d.error||('Ошибка '+r.status));}
+  }catch(e){res.className='form-result err show';res.textContent='Сетевая ошибка: '+e.message;}
+});
+
+// ── Audit log ─────────────────────────────────────────────────
+async function refreshAudit(){
+  const limit=document.getElementById('auditLimit').value;
+  try{
+    const r=await fetch('/admin/api/audit?limit='+limit,{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok)return;
+    const d=await r.json();
+    const tbl=document.getElementById('auditTable');
+    tbl.innerHTML='<tr><th>Время</th><th>IP</th><th>Действие</th><th>Результат</th><th>Причина</th><th>Метаданные</th></tr>';
+    const entries=d.entries||[];
+    for(const e of entries){
+      const ts=e.ts?new Date(e.ts).toLocaleString():'';
+      const resClass=e.result==='ok'?'online':(e.result==='fail'||e.result==='denied'?'offline':'');
+      const meta=e.meta?Object.entries(e.meta).map(([k,v])=>k+'='+v).join(', '):'';
+      tbl.innerHTML+='<tr><td>'+esc(ts)+'</td><td class="ip">'+esc(e.ip||'')+'</td><td>'+esc(e.action||'')+'</td><td class="'+resClass+'">'+esc(e.result||'')+'</td><td>'+esc(e.reason||'')+'</td><td style="font-size:10px">'+esc(meta)+'</td></tr>';
+    }
+    document.getElementById('auditNote').textContent='Показано: '+entries.length+(d.total_file?' (всего в файле: '+d.total_file+')':'')+(d.note?' — '+d.note:'');
+  }catch(e){document.getElementById('auditNote').textContent='Ошибка: '+e.message;}
+}
+document.getElementById('btnAuditRefresh').addEventListener('click',refreshAudit);
+document.getElementById('auditLimit').addEventListener('change',refreshAudit);
+
+// ── Server logs tail ─────────────────────────────────────────────────
+// ── Server logs tail (categorized 2026-04-27) ───────────────────────
+let logsCurrentCategory='';
+let logsAutoRefreshTimer=null;
+let logsSearchDebounceTimer=null;
+
+function levelColor(lvl){
+  if(lvl==='ERROR')return '#f85149';
+  if(lvl==='WARN')return '#d29922';
+  if(lvl==='DEBUG')return '#8b949e';
+  return '#58a6ff'; // INFO default — soft blue
+}
+
+function moduleColor(mod){
+  // Каждый модуль — свой цвет для quick visual scan.
+  const colors={
+    'WS':'#79c0ff', 'API':'#a5d6ff', 'Signaling':'#bc8cff',
+    'Session':'#ffa657', 'Admin':'#f97583', 'Auth':'#ff7b72',
+    'UnattendedAuth':'#ff7b72', 'Telemetry':'#7ee787',
+    'Suspicious':'#f85149', 'Update':'#d2a8ff', 'Main':'#8b949e',
+  };
+  return colors[mod]||'#c9d1d9';
+}
+
+function fmtTs(ts){
+  // ts looks like 2026-04-27T08:24:27.241260636Z — show only HH:MM:SS.mmm
+  if(!ts||ts.length<19)return ts||'';
+  const t=ts.substring(11,19);
+  const ms=ts.length>20?ts.substring(20,23):'';
+  return ms?t+'.'+ms:t;
+}
+
+async function refreshLogs(){
+  const lines=document.getElementById('logsLines').value;
+  const level=document.getElementById('logsLevel').value;
+  const search=document.getElementById('logsSearch').value;
+  try{
+    const params=new URLSearchParams({lines:lines});
+    if(level)params.set('level',level);
+    if(logsCurrentCategory)params.set('category',logsCurrentCategory);
+    if(search)params.set('search',search);
+    const r=await fetch('/admin/api/logs?'+params.toString(),{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok){document.getElementById('logsNote').textContent='Ошибка '+r.status;return;}
+    const d=await r.json();
+    const items=d.items||[];
+    const tbody=document.getElementById('logsTableBody');
+
+    // Update category counters.
+    const counts=d.category_counts||{};
+    document.querySelectorAll('[data-cat-count]').forEach(el=>{
+      const cat=el.getAttribute('data-cat-count');
+      if(cat==='all')el.textContent=d.total_all||0;
+      else el.textContent=counts[cat]||0;
+    });
+
+    if(items.length===0){
+      tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:#8b949e">Нет записей в этой категории</td></tr>';
+    }else{
+      tbody.innerHTML=items.map(it=>{
+        const ctx=[];
+        if(it.session_id)ctx.push('<span style="color:#8b949e">session=</span><span style="color:#79c0ff">'+esc(it.session_id.substring(0,8))+'…</span>');
+        if(it.ip)ctx.push('<span style="color:#8b949e">ip=</span><span style="color:#a5d6ff">'+esc(it.ip)+'</span>');
+        if(it.error)ctx.push('<span style="color:#f85149">err='+esc(it.error.substring(0,80))+'</span>');
+        const ctxStr=ctx.length?' <span style="opacity:0.7">'+ctx.join(' ')+'</span>':'';
+        const msg=it.message?esc(it.message.length>200?it.message.substring(0,200)+'…':it.message):'';
+        return '<tr style="border-bottom:1px solid #21262d">'+
+          '<td style="padding:5px 10px;color:#8b949e;white-space:nowrap;vertical-align:top">'+esc(fmtTs(it.ts))+'</td>'+
+          '<td style="padding:5px 10px;color:'+levelColor(it.level)+';font-weight:600;vertical-align:top">'+esc(it.level||'')+'</td>'+
+          '<td style="padding:5px 10px;color:'+moduleColor(it.module)+';white-space:nowrap;vertical-align:top">'+esc(it.module||'')+'</td>'+
+          '<td style="padding:5px 10px;color:#c9d1d9;white-space:nowrap;vertical-align:top">'+esc(it.event||'')+'</td>'+
+          '<td style="padding:5px 10px;color:#c9d1d9;vertical-align:top;word-break:break-word">'+msg+ctxStr+'</td>'+
+          '</tr>';
+      }).join('');
+    }
+
+    // Auto-scroll to bottom (newest at end since logs are tail-N).
+    const wrapper=document.getElementById('logsTableWrapper');
+    wrapper.scrollTop=wrapper.scrollHeight;
+
+    const noteParts=[];
+    noteParts.push('Показано: '+items.length);
+    if(d.total_filtered!==items.length)noteParts.push('отфильтровано: '+d.total_filtered);
+    noteParts.push('всего в файле: '+d.total_all);
+    if(d.note)noteParts.push(d.note);
+    document.getElementById('logsNote').textContent=noteParts.join(' · ');
+  }catch(e){document.getElementById('logsNote').textContent='Сетевая ошибка: '+e.message;}
+}
+
+// Category chip click handlers.
+document.querySelectorAll('.logcat-chip').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    logsCurrentCategory=btn.getAttribute('data-cat');
+    // Visual: highlight selected chip.
+    document.querySelectorAll('.logcat-chip').forEach(b=>{
+      const isSelected=b.getAttribute('data-cat')===logsCurrentCategory;
+      b.style.background=isSelected?'#1f2937':'#0f1117';
+      b.style.color=isSelected?'#e1e4e8':(b.getAttribute('data-cat')==='issues'?'#f85149':'#8b949e');
+      b.style.borderColor=isSelected?'#58a6ff':'#30363d';
+    });
+    refreshLogs();
+  });
+});
+
+// Search debounce — fire через 300ms после последнего ввода.
+document.getElementById('logsSearch').addEventListener('input',()=>{
+  if(logsSearchDebounceTimer)clearTimeout(logsSearchDebounceTimer);
+  logsSearchDebounceTimer=setTimeout(refreshLogs,300);
+});
+
+// Auto-refresh toggle.
+document.getElementById('logsAutoRefresh').addEventListener('change',(e)=>{
+  if(e.target.checked){
+    logsAutoRefreshTimer=setInterval(refreshLogs,5000);
+  }else{
+    if(logsAutoRefreshTimer){clearInterval(logsAutoRefreshTimer);logsAutoRefreshTimer=null;}
+  }
+});
+
+document.getElementById('btnLogsRefresh').addEventListener('click',refreshLogs);
+document.getElementById('logsLines').addEventListener('change',refreshLogs);
+document.getElementById('logsLevel').addEventListener('change',refreshLogs);
+
+// ── Active sessions ─────────────────────────────────────────────────
+async function refreshSessions(){
+  try{
+    const r=await fetch('/admin/api/sessions',{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!r.ok)return;
+    const d=await r.json();
+    const tbl=document.getElementById('sessionsTable');
+    tbl.innerHTML='<tr><th>ID (prefix)</th><th>IP</th><th>Создана</th><th>Последняя активность</th><th></th></tr>';
+    for(const s of (d.sessions||[])){
+      const me=s.is_me?' <span style="color:#3fb950;font-weight:bold">← вы</span>':'';
+      const created=new Date(s.created_at).toLocaleString();
+      const last=new Date(s.last_active).toLocaleString();
+      tbl.innerHTML+='<tr><td style="font-family:monospace">'+esc(s.id)+'</td><td class="ip">'+esc(s.ip)+'</td><td>'+esc(created)+'</td><td>'+esc(last)+'</td><td>'+me+'</td></tr>';
+    }
+    document.getElementById('sessionsNote').textContent='Активных сессий: '+(d.count||0);
+  }catch(e){document.getElementById('sessionsNote').textContent='Ошибка: '+e.message;}
+}
+document.getElementById('btnSessionsRefresh').addEventListener('click',refreshSessions);
+
+// Extend onPageChange to handle new tabs
+const origOnPageChange=onPageChange;
+onPageChange=function(pg){
+  origOnPageChange(pg);
+  if(pg==='audit'){refreshAudit();}
+  else if(pg==='logs'){refreshLogs();}
+  else if(pg==='sessions'){refreshSessions();}
+  else if(pg==='webrtc'){refreshWebRTC();}
+  else if(pg==='bans'){refreshBans();}
+};
+
+// ── Bootstrap ─────────────────────────────────────────────────
+(async()=>{
+  if(!(await loadCSRF()))return;
+  loadMaintenance();
+  onPageChange('overview');
+})();
+</script>
+</body>
+</html>

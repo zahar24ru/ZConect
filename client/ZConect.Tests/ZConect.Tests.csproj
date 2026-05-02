@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Must match UiApp TFM (net8.0-windows10.0.19041.0) для InternalsVisibleTo + UiApp reference. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WebRtcTransport\WebRtcTransport.csproj" />
+    <ProjectReference Include="..\FileTransfer\FileTransfer.csproj" />
+    <ProjectReference Include="..\QualityController\QualityController.csproj" />
+    <ProjectReference Include="..\UiApp\UiApp.csproj" />
+    <ProjectReference Include="..\ZConectService\ZConectService.csproj" />
+  </ItemGroup>
+  <!-- LiveHost тесту нужна mrwebrtc.dll. ProjectReference её не подтягивает
+       автоматически — копируем из nuget кеша при -r win-x64 билде. -->
+  <Target Name="CopyMrWebrtcForTests" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.mixedreality.webrtc\2.0.2\runtimes\win10-x64\native\mrwebrtc.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(NuGetPackageRoot)microsoft.mixedreality.webrtc\2.0.2\runtimes\win10-x64\native\mrwebrtc.dll')" />
+  </Target>
+</Project>

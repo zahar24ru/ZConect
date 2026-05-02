@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Russian translations.
+    Locale: ru — applied automatically when device language = Russian.
+    Default fallback: values/strings.xml
+-->
+<resources>
+    <string name="app_name">ZConnect</string>
+
+    <!-- ═══════════ Common ═══════════ -->
+    <string name="common_back">Назад</string>
+    <string name="common_save">Сохранить</string>
+    <string name="common_cancel">Отмена</string>
+    <string name="common_delete">Удалить</string>
+    <string name="common_edit">Изменить</string>
+    <string name="common_clear">Очистить</string>
+    <string name="common_change">Изменить</string>
+    <string name="common_got_it">Понятно</string>
+    <string name="common_unknown_error">Неизвестная ошибка</string>
+
+    <!-- ═══════════ Connect screen ═══════════ -->
+    <string name="connect_title">Z Viewer</string>
+    <string name="connect_open_address_book">Адресная книга</string>
+    <string name="connect_open_settings">Настройки</string>
+    <string name="connect_server_format">Сервер: %1$s</string>
+    <string name="connect_recent_title">Недавно подключённые</string>
+    <string name="connect_to_address_book">В адресную книгу →</string>
+    <string name="connect_login_label">Логин</string>
+    <string name="connect_pass_label">Пароль</string>
+    <string name="connect_button">Подключиться</string>
+    <string name="connect_button_in_progress">Подключение…</string>
+
+    <!-- Connect errors -->
+    <string name="error_invalid_credentials">Неверный логин или пароль</string>
+    <string name="error_banned">Ваш IP заблокирован на сервере. Обратитесь к администратору.</string>
+    <string name="error_session_blocked">Сессия заблокирована из-за многих неверных попыток. Хост должен обновить пароль.</string>
+    <string name="error_session_locked_format">Слишком много попыток. Попробуйте через %1$d сек.</string>
+    <string name="error_session_locked_unspecified">Сессия временно заблокирована. Попробуйте позже.</string>
+    <string name="error_maintenance">Сервер на техническом обслуживании. Попробуйте позже.</string>
+    <string name="error_network">Нет связи с сервером. Проверьте интернет.</string>
+    <string name="error_generic_format">Ошибка подключения: %1$s</string>
+
+    <!-- Unattended password -->
+    <string name="unattended_dialog_title">Требуется пароль</string>
+    <string name="unattended_dialog_message">Хост принимает подключения по паролю без подтверждения.</string>
+    <string name="unattended_dialog_field_label">Пароль</string>
+    <string name="unattended_dialog_submit">Подключиться</string>
+    <string name="unattended_dialog_cancel">Ждать подтверждения</string>
+    <string name="unattended_dialog_remember">Запомнить пароль для этого контакта</string>
+    <string name="unattended_wrong_password_format">Неверный пароль. Осталось попыток: %1$d</string>
+    <string name="unattended_locked_out_format">Слишком много неверных попыток. Заблокировано на %1$d сек (уровень %2$d).</string>
+    <string name="unattended_status_authenticating">Авторизация…</string>
+
+    <!-- Save-to-contacts dialog -->
+    <string name="save_to_contacts_title">Сохранить в адресную книгу</string>
+    <string name="save_to_contacts_message">Дайте имя этому подключению (например «Мамин ПК», «Офис»). После сохранения оно появится в адресной книге.</string>
+    <string name="save_to_contacts_name_label">Имя</string>
+    <string name="save_to_contacts_name_placeholder">Рабочий ПК</string>
+    <string name="save_to_contacts_login_format">Логин: %1$s••••</string>
+    <string name="save_to_contacts_button_save_short">Сохранить</string>
+
+    <!-- ═══════════ Address Book ═══════════ -->
+    <string name="ab_title">Адресная книга</string>
+    <string name="ab_search_placeholder">Поиск по имени или логину</string>
+    <string name="ab_search_no_results">Ничего не найдено</string>
+    <string name="ab_empty_title">Нет сохранённых контактов</string>
+    <string name="ab_empty_subtitle">Нажмите «Добавить» чтобы сохранить первый ПК</string>
+    <string name="ab_add_button">Добавить</string>
+    <string name="ab_sort_by_time">По времени</string>
+    <string name="ab_sort_by_name">По имени</string>
+    <string name="ab_sort_label">Сортировка</string>
+    <string name="ab_delete_dialog_title_format">Удалить «%1$s»?</string>
+    <string name="ab_delete_dialog_message">Это действие нельзя отменить.</string>
+    <string name="ab_dialog_add_title">Добавить контакт</string>
+    <string name="ab_dialog_edit_title">Изменить контакт</string>
+    <string name="ab_name_label">Имя</string>
+    <string name="ab_name_placeholder">Домашний ПК, Рабочий ноут…</string>
+
+    <!-- ═══════════ Settings ═══════════ -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_section_server">Сервер</string>
+    <string name="settings_section_webrtc">WebRTC</string>
+    <string name="settings_section_display">Экран хоста (резерв)</string>
+    <string name="settings_section_input">Ввод и поведение</string>
+
+    <string name="settings_server_label">Адрес сервера</string>
+    <string name="settings_server_placeholder">https://host  или  ip:port</string>
+    <string name="settings_server_help">HTTPS (prod) → wss://; без схемы / http:// → ws://</string>
+
+    <string name="settings_test_default">Проверить подключение</string>
+    <string name="settings_test_running">Проверка…</string>
+    <string name="settings_test_ok">Подключено</string>
+    <string name="settings_test_failed">Ошибка</string>
+    <string name="settings_test_server_ok_format">Сервер OK (%1$d)</string>
+    <string name="settings_test_http_format">HTTP %1$d</string>
+    <string name="settings_test_refused">Соединение отклонено</string>
+    <string name="settings_test_timeout">Тайм-аут — сервер недоступен</string>
+
+    <string name="settings_stun_label">STUN-сервер</string>
+    <string name="settings_stun_placeholder">stun:ip:port</string>
+    <string name="settings_turn_label">TURN-сервер</string>
+    <string name="settings_turn_placeholder">turn:ip:port</string>
+    <string name="settings_turn_user_label">TURN-логин</string>
+    <string name="settings_turn_pass_label">TURN-пароль</string>
+
+    <string name="settings_display_width">Ширина</string>
+    <string name="settings_display_height">Высота</string>
+
+    <string name="settings_trackpad_speed_format">Чувствительность тачпада: %1$.1fx</string>
+    <string name="settings_scroll_speed_format">Скорость прокрутки: %1$d</string>
+    <string name="settings_autoreconnect_title">Автопереподключение</string>
+    <string name="settings_autoreconnect_subtitle">Подключаться заново при разрыве связи</string>
+    <string name="settings_reset_button">Сбросить настройки</string>
+
+    <!-- ═══════════ Gesture help dialog ═══════════ -->
+    <string name="gestures_title">Жесты и подсказки</string>
+    <string name="gestures_section_trackpad">Режим тачпада</string>
+    <string name="gestures_section_trackpad_current">Режим тачпада (текущий)</string>
+    <string name="gestures_section_directtouch">Прямой ввод</string>
+    <string name="gestures_section_directtouch_current">Прямой ввод (текущий)</string>
+    <string name="gestures_section_toolbar">Панель инструментов</string>
+
+    <!-- Trackpad gestures -->
+    <string name="gesture_tap_title">Касание</string>
+    <string name="gesture_tap_desc_trackpad">Левый клик в позиции курсора</string>
+    <string name="gesture_tap_desc_direct">Левый клик в точке касания</string>
+    <string name="gesture_doubletap_title">Двойное касание</string>
+    <string name="gesture_doubletap_desc_trackpad">Двойной клик (открыть папку, расширить выделение)</string>
+    <string name="gesture_doubletap_desc_direct">Двойной клик в точке касания</string>
+    <string name="gesture_drag1_title">Один палец — скольжение</string>
+    <string name="gesture_drag1_desc_trackpad">Перемещение курсора (как тачпад)</string>
+    <string name="gesture_drag1_desc_direct">Перемещение мыши</string>
+    <string name="gesture_holddrag_title">Удержать ½ сек и тянуть</string>
+    <string name="gesture_holddrag_desc">Перетаскивание с зажатой ЛКМ (окно, выделение текста)</string>
+    <string name="gesture_longpress_title">Долгое нажатие (без движения)</string>
+    <string name="gesture_longpress_desc">Правый клик</string>
+    <string name="gesture_longpress_direct_title">Долгое нажатие</string>
+    <string name="gesture_longpress_direct_desc">Правый клик в точке касания</string>
+    <string name="gesture_2tap_title">Два пальца — касание</string>
+    <string name="gesture_2tap_desc">Правый клик</string>
+    <string name="gesture_2drag_title">Два пальца — скольжение</string>
+    <string name="gesture_2drag_desc">Прокрутка вертикально</string>
+    <string name="gesture_2drag_zoomed_title">Два пальца — скольжение (при увеличении)</string>
+    <string name="gesture_2drag_zoomed_desc">Сместить вид (когда видео увеличено)</string>
+    <string name="gesture_zoom_title">Кнопки + / −</string>
+    <string name="gesture_zoom_desc">Увеличить / уменьшить</string>
+
+    <!-- Toolbar tips -->
+    <string name="toolbar_tip_swipedown_title">Свайп сверху</string>
+    <string name="toolbar_tip_swipedown_desc">Показать панель</string>
+    <string name="toolbar_tip_pin_title">Иконка булавки</string>
+    <string name="toolbar_tip_pin_desc">Закрепить панель (всегда видна)</string>
+    <string name="toolbar_tip_eye_title">Иконка глаза</string>
+    <string name="toolbar_tip_eye_desc">Скрыть панель</string>
+    <string name="toolbar_tip_mode_title">Иконка мыши/касания</string>
+    <string name="toolbar_tip_mode_desc">Переключить тачпад ↔ прямой ввод</string>
+    <string name="toolbar_tip_fit_title">Иконка масштаба</string>
+    <string name="toolbar_tip_fit_desc">Вписать (с полями) vs заполнить (с обрезкой)</string>
+</resources>

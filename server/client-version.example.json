@@ -1,0 +1,7 @@
+{
+  "latest_version": "1.0.1",
+  "download_url": "https://zconect.ru/download/ZConect-Setup-1.0.1.exe",
+  "release_notes": "- Исправлен title «ZConnect» в заголовке окна\n- First-run onboarding (3-шаговый guide)\n- Connection progress stepper (Signaling → ICE → Stream → Ready)\n- Bottom snackbar для in-app уведомлений\n- Auto-update notification",
+  "min_compatible_version": "1.0.0",
+  "published_at": "2026-04-21"
+}

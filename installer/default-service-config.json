@@ -1,0 +1,13 @@
+{
+  "SignalingUrl": "https://connect.zconn.ru",
+  "WebSocketUrl": "wss://connect.zconn.ru/ws",
+  "StunUrl": "stun:92.63.102.244:3478",
+  "TurnUrl": "turn:92.63.102.244:3478",
+  "TurnUsername": "",
+  "TurnPassword": "",
+  "UnattendedPassword": "",
+  "UnattendedEnabled": true,
+  "HelperExePath": "",
+  "AutoSpawnHelper": true
+}
+

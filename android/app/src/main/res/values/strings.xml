@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    English strings (default).
+    Locale: en — fallback if no values-XX/strings.xml matches device locale.
+    For Russian translation see: values-ru/strings.xml
+-->
+<resources>
+    <string name="app_name">ZConnect</string>
+
+    <!-- ═══════════ Common buttons & labels ═══════════ -->
+    <string name="common_back">Back</string>
+    <string name="common_save">Save</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_change">Change</string>
+    <string name="common_got_it">Got it</string>
+    <string name="common_unknown_error">Unknown error</string>
+
+    <!-- ═══════════ Connect screen (main) ═══════════ -->
+    <string name="connect_title">Z Viewer</string>
+    <string name="connect_open_address_book">Address Book</string>
+    <string name="connect_open_settings">Settings</string>
+    <string name="connect_server_format">Server: %1$s</string>
+    <string name="connect_recent_title">Recent connections</string>
+    <string name="connect_to_address_book">To address book →</string>
+    <string name="connect_login_label">Login Code</string>
+    <string name="connect_pass_label">Pass Code</string>
+    <string name="connect_button">Connect</string>
+    <string name="connect_button_in_progress">Connecting…</string>
+
+    <!-- Connect errors (mirror SessionApi.ApiException) -->
+    <string name="error_invalid_credentials">Invalid login or pass code</string>
+    <string name="error_banned">Your IP is banned on the server. Contact administrator.</string>
+    <string name="error_session_blocked">Session blocked due to too many wrong attempts. Host must refresh password.</string>
+    <string name="error_session_locked_format">Too many attempts. Try again in %1$d sec.</string>
+    <string name="error_session_locked_unspecified">Session temporarily locked. Try later.</string>
+    <string name="error_maintenance">Server is under maintenance. Try later.</string>
+    <string name="error_network">No connection to server. Check your internet.</string>
+    <string name="error_generic_format">Connection error: %1$s</string>
+
+    <!-- Unattended password (host requires password to connect silently) -->
+    <string name="unattended_dialog_title">Password required</string>
+    <string name="unattended_dialog_message">This host accepts connections silently with a password.</string>
+    <string name="unattended_dialog_field_label">Password</string>
+    <string name="unattended_dialog_submit">Connect</string>
+    <string name="unattended_dialog_cancel">Wait for confirmation</string>
+    <string name="unattended_dialog_remember">Remember password for this contact</string>
+    <string name="unattended_wrong_password_format">Wrong password. Attempts left: %1$d</string>
+    <string name="unattended_locked_out_format">Too many wrong attempts. Locked for %1$d sec (tier %2$d).</string>
+    <string name="unattended_status_authenticating">Authenticating…</string>
+
+    <!-- Save-to-contacts dialog (Recent → Address Book) -->
+    <string name="save_to_contacts_title">Save to address book</string>
+    <string name="save_to_contacts_message">Give this connection a name (e.g. \"Mom\'s PC\", \"Office\"). It will appear in your address book.</string>
+    <string name="save_to_contacts_name_label">Name</string>
+    <string name="save_to_contacts_name_placeholder">Work PC</string>
+    <string name="save_to_contacts_login_format">Login: %1$s••••</string>
+    <string name="save_to_contacts_button_save_short">Save</string>
+
+    <!-- ═══════════ Address Book screen ═══════════ -->
+    <string name="ab_title">Address Book</string>
+    <string name="ab_search_placeholder">Search by name or login</string>
+    <string name="ab_search_no_results">Nothing found</string>
+    <string name="ab_empty_title">No saved contacts</string>
+    <string name="ab_empty_subtitle">Tap \"Add\" to save your first PC</string>
+    <string name="ab_add_button">Add</string>
+    <string name="ab_sort_by_time">By time</string>
+    <string name="ab_sort_by_name">By name</string>
+    <string name="ab_sort_label">Sort</string>
+    <string name="ab_delete_dialog_title_format">Delete \"%1$s\"?</string>
+    <string name="ab_delete_dialog_message">This cannot be undone.</string>
+    <string name="ab_dialog_add_title">Add contact</string>
+    <string name="ab_dialog_edit_title">Edit contact</string>
+    <string name="ab_name_label">Name</string>
+    <string name="ab_name_placeholder">Home PC, Work laptop…</string>
+
+    <!-- ═══════════ Settings screen ═══════════ -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_section_webrtc">WebRTC</string>
+    <string name="settings_section_display">Host Display (fallback)</string>
+    <string name="settings_section_input">Input &amp; Behavior</string>
+
+    <string name="settings_server_label">Server Address</string>
+    <string name="settings_server_placeholder">https://host  or  ip:port</string>
+    <string name="settings_server_help">HTTPS (prod) → wss://; no scheme / http:// → ws://</string>
+
+    <string name="settings_test_default">Test Connection</string>
+    <string name="settings_test_running">Testing…</string>
+    <string name="settings_test_ok">Connected</string>
+    <string name="settings_test_failed">Failed</string>
+    <string name="settings_test_server_ok_format">Server OK (%1$d)</string>
+    <string name="settings_test_http_format">HTTP %1$d</string>
+    <string name="settings_test_refused">Connection refused</string>
+    <string name="settings_test_timeout">Timeout — server not reachable</string>
+
+    <string name="settings_stun_label">STUN Server</string>
+    <string name="settings_stun_placeholder">stun:ip:port</string>
+    <string name="settings_turn_label">TURN Server</string>
+    <string name="settings_turn_placeholder">turn:ip:port</string>
+    <string name="settings_turn_user_label">TURN User</string>
+    <string name="settings_turn_pass_label">TURN Password</string>
+
+    <string name="settings_display_width">Width</string>
+    <string name="settings_display_height">Height</string>
+
+    <string name="settings_trackpad_speed_format">Trackpad sensitivity: %1$.1fx</string>
+    <string name="settings_scroll_speed_format">Scroll speed: %1$d</string>
+    <string name="settings_autoreconnect_title">Auto-reconnect</string>
+    <string name="settings_autoreconnect_subtitle">Reconnect automatically if connection drops</string>
+    <string name="settings_reset_button">Reset to Defaults</string>
+
+    <!-- ═══════════ Gesture help dialog ═══════════ -->
+    <string name="gestures_title">Gestures &amp; Tips</string>
+    <string name="gestures_section_trackpad">Trackpad mode</string>
+    <string name="gestures_section_trackpad_current">Trackpad mode (current)</string>
+    <string name="gestures_section_directtouch">Direct touch mode</string>
+    <string name="gestures_section_directtouch_current">Direct touch mode (current)</string>
+    <string name="gestures_section_toolbar">Toolbar</string>
+
+    <!-- Trackpad gestures -->
+    <string name="gesture_tap_title">Tap</string>
+    <string name="gesture_tap_desc_trackpad">Left click at cursor</string>
+    <string name="gesture_tap_desc_direct">Left click at touch position</string>
+    <string name="gesture_doubletap_title">Double tap</string>
+    <string name="gesture_doubletap_desc_trackpad">Double-click (open folder, expand selection)</string>
+    <string name="gesture_doubletap_desc_direct">Double-click at touch position</string>
+    <string name="gesture_drag1_title">1 finger drag</string>
+    <string name="gesture_drag1_desc_trackpad">Move cursor (like a touchpad)</string>
+    <string name="gesture_drag1_desc_direct">Move mouse</string>
+    <string name="gesture_holddrag_title">Hold ½ sec then drag</string>
+    <string name="gesture_holddrag_desc">Drag with left button (move window, select text)</string>
+    <string name="gesture_longpress_title">Long press (no drag)</string>
+    <string name="gesture_longpress_desc">Right click</string>
+    <string name="gesture_longpress_direct_title">Long press</string>
+    <string name="gesture_longpress_direct_desc">Right click at touch position</string>
+    <string name="gesture_2tap_title">2 finger tap</string>
+    <string name="gesture_2tap_desc">Right click</string>
+    <string name="gesture_2drag_title">2 finger drag</string>
+    <string name="gesture_2drag_desc">Scroll vertically</string>
+    <string name="gesture_2drag_zoomed_title">2 finger drag (zoomed)</string>
+    <string name="gesture_2drag_zoomed_desc">Pan view (when video zoomed in)</string>
+    <string name="gesture_zoom_title">+ / − buttons</string>
+    <string name="gesture_zoom_desc">Zoom in / out</string>
+
+    <!-- Toolbar tips -->
+    <string name="toolbar_tip_swipedown_title">Swipe down from top</string>
+    <string name="toolbar_tip_swipedown_desc">Show toolbar</string>
+    <string name="toolbar_tip_pin_title">Pin icon</string>
+    <string name="toolbar_tip_pin_desc">Keep toolbar always visible</string>
+    <string name="toolbar_tip_eye_title">Eye icon</string>
+    <string name="toolbar_tip_eye_desc">Hide toolbar manually</string>
+    <string name="toolbar_tip_mode_title">Mouse/Touch icon</string>
+    <string name="toolbar_tip_mode_desc">Switch Trackpad ↔ Direct Touch mode</string>
+    <string name="toolbar_tip_fit_title">Fit icon</string>
+    <string name="toolbar_tip_fit_desc">Fit image (letterbox) vs Fill (crop)</string>
+</resources>

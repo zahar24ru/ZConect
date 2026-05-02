@@ -1,0 +1,397 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:conv="clr-namespace:UiApp.Converters">
+
+  <!-- Converters — defined here so StaticResource in this file's styles can find them. -->
+  <conv:DigitsOnlyValidConverter x:Key="DigitsOnlyValidConverter"/>
+  <conv:ValidJoinCodesConverter x:Key="ValidJoinCodesConverter"/>
+  <conv:NameToInitialConverter x:Key="NameToInitialConverter"/>
+  <conv:NameToColorConverter x:Key="NameToColorConverter"/>
+
+  <!-- Drop shadow for card Borders — subtle depth. -->
+  <DropShadowEffect x:Key="CardShadow" BlurRadius="10" ShadowDepth="1.5"
+                    Direction="270" Opacity="0.10" Color="#000000"/>
+
+  <!-- Custom focus visual: rounded accent-colored outline instead of
+       WPF default dashed rectangle. Applied globally via Control.FocusVisualStyle. -->
+  <Style x:Key="AppFocusVisual">
+    <Setter Property="Control.Template">
+      <Setter.Value>
+        <ControlTemplate>
+          <Border CornerRadius="6"
+                  BorderThickness="2"
+                  Margin="-3"
+                  SnapsToDevicePixels="True">
+            <Border.BorderBrush>
+              <SolidColorBrush Color="{DynamicResource PrimaryColor}" Opacity="0.6"/>
+            </Border.BorderBrush>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+
+
+  <!-- ═══ Brushes are defined in LightColors.xaml / DarkColors.xaml ═══ -->
+  <!-- ═══ This file only contains styles that reference those brushes ═══ -->
+
+  <!-- ═══ Button: Primary (blue bg, white text) ═══ -->
+  <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisual}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="8"
+                  Padding="{TemplateBinding Padding}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  BorderBrush="{TemplateBinding BorderBrush}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{StaticResource PrimaryHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ═══ Button: Secondary (border, transparent bg) ═══ -->
+  <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisual}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="8"
+                  Padding="{TemplateBinding Padding}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  BorderBrush="{TemplateBinding BorderBrush}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{StaticResource HoverBgBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Global TextBox: ensure enough height for Wpf.Ui padding + focus glow. -->
+  <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Style.Triggers>
+      <Trigger Property="IsKeyboardFocusWithin" Value="True">
+        <Setter Property="Effect">
+          <Setter.Value>
+            <DropShadowEffect BlurRadius="5" ShadowDepth="0"
+                              Opacity="0.18" Color="{StaticResource PrimaryColor}"/>
+          </Setter.Value>
+        </Setter>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- Named styles for explicit use in XAML -->
+  <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style x:Key="ReadOnlyTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource RoundedTextBoxStyle}">
+    <Setter Property="IsReadOnly" Value="True"/>
+  </Style>
+
+  <!-- Digits-only input (e.g. login/pass code). Red border highlight when
+       content contains non-digit characters or partial input < 8 digits. -->
+  <Style x:Key="DigitsOnlyTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource RoundedTextBoxStyle}">
+    <Style.Triggers>
+      <!-- Text contains any character that's not 0-9 → red border -->
+      <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Text, Converter={StaticResource DigitsOnlyValidConverter}}" Value="False">
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+      </DataTrigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- ═══ Button: Danger (red bg) ═══ -->
+  <Style x:Key="DangerButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource DangerBgBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisual}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="8"
+                  Padding="{TemplateBinding Padding}"
+                  BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{StaticResource DangerHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ═══ Button: Icon (transparent, small, inline) ═══ -->
+  <Style x:Key="IconButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="4"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Width" Value="26"/>
+    <Setter Property="Height" Value="26"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisual}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="5"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{StaticResource HoverBgBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Compact Menu/MenuItem -->
+  <Style TargetType="Menu" BasedOn="{StaticResource {x:Type Menu}}">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="MinHeight" Value="22"/>
+  </Style>
+  <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="MinHeight" Value="26"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Style.Triggers>
+      <Trigger Property="IsHighlighted" Value="True">
+        <Setter Property="Background" Value="{StaticResource SelectedBgBrush}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- Fix: ensure ComboBox text visible + not clipped with Wpf.Ui theme -->
+  <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+    <Setter Property="MinHeight" Value="34"/>
+  </Style>
+
+  <!-- ═══ Thin, theme-aware ScrollBar (global) ═══
+       Vertical 8px wide, horizontal 8px tall. Thumb brightens on hover. -->
+  <Style x:Key="ThinScrollBarThumb" TargetType="Thumb">
+    <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Border x:Name="Bd" CornerRadius="4"
+                  Background="{TemplateBinding Background}"/>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background">
+                <Setter.Value>
+                  <SolidColorBrush Color="{DynamicResource TextSecondaryColor}"/>
+                </Setter.Value>
+              </Setter>
+            </Trigger>
+            <Trigger Property="IsDragging" Value="True">
+              <Setter TargetName="Bd" Property="Background">
+                <Setter.Value>
+                  <SolidColorBrush Color="{DynamicResource PrimaryColor}"/>
+                </Setter.Value>
+              </Setter>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ScrollBar">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Foreground" Value="{StaticResource BorderBrush}"/>
+    <Style.Triggers>
+      <Trigger Property="Orientation" Value="Vertical">
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ScrollBar">
+              <Grid Background="Transparent">
+                <Track Name="PART_Track" IsDirectionReversed="True">
+                  <Track.Thumb>
+                    <Thumb Style="{StaticResource ThinScrollBarThumb}" Margin="2,0"/>
+                  </Track.Thumb>
+                  <Track.IncreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                  Opacity="0" Focusable="False"/>
+                  </Track.IncreaseRepeatButton>
+                  <Track.DecreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                  Opacity="0" Focusable="False"/>
+                  </Track.DecreaseRepeatButton>
+                </Track>
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Trigger>
+      <Trigger Property="Orientation" Value="Horizontal">
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ScrollBar">
+              <Grid Background="Transparent">
+                <Track Name="PART_Track">
+                  <Track.Thumb>
+                    <Thumb Style="{StaticResource ThinScrollBarThumb}" Margin="0,2"/>
+                  </Track.Thumb>
+                  <Track.IncreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageRightCommand"
+                                  Opacity="0" Focusable="False"/>
+                  </Track.IncreaseRepeatButton>
+                  <Track.DecreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageLeftCommand"
+                                  Opacity="0" Focusable="False"/>
+                  </Track.DecreaseRepeatButton>
+                </Track>
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- ═══ TabItem: Win11 Explorer style — selected tab merges with content,
+       rounded top corners, accent bar on top of selected, smooth hover.
+       Inline SolidColorBrush with DynamicResource Color in triggers for live theme switch. -->
+  <Style TargetType="TabItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    <Setter Property="Padding" Value="14,8"/>
+    <Setter Property="Margin" Value="0,0,2,0"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="8,8,0,0"
+                  Padding="{TemplateBinding Padding}"
+                  Cursor="Hand">
+            <ContentPresenter ContentSource="Header"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background">
+                <Setter.Value>
+                  <SolidColorBrush Color="{DynamicResource HoverBgColor}"/>
+                </Setter.Value>
+              </Setter>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Bd" Property="Background">
+                <Setter.Value>
+                  <!-- Selected: merge with the content surface below. -->
+                  <SolidColorBrush Color="{DynamicResource SurfaceBgColor}"/>
+                </Setter.Value>
+              </Setter>
+              <Setter Property="FontWeight" Value="SemiBold"/>
+              <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ═══ TabControl: tab strip on WindowBg (darker than content) so
+       unselected tabs "float" in the strip; selected pops forward as SurfaceBg. -->
+  <Style TargetType="TabControl">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBgBrush}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabControl">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Tab strip background (WindowBg — darker, creates contrast).
+                 UniformGrid with Rows=1 — all tabs share equal width and all
+                 stretch/shrink together when window is resized. -->
+            <Border Grid.Row="0" Background="{DynamicResource WindowBgBrush}"
+                    CornerRadius="8,8,0,0" ClipToBounds="True">
+              <UniformGrid x:Name="HeaderPanel" Rows="1"
+                           IsItemsHost="True" Panel.ZIndex="1"
+                           KeyboardNavigation.TabIndex="1" Margin="4,4,4,0"/>
+            </Border>
+            <!-- Content area with U-shape frame (left/right/bottom) matching
+                 tab strip color — selected tab visually merges into this frame. -->
+            <Border Grid.Row="1" Background="{TemplateBinding Background}"
+                    CornerRadius="0,0,8,8"
+                    BorderThickness="6,0,6,6"
+                    Padding="{TemplateBinding Padding}">
+              <Border.BorderBrush>
+                <SolidColorBrush Color="{DynamicResource WindowBgColor}"/>
+              </Border.BorderBrush>
+              <ContentPresenter x:Name="PART_Content" ContentSource="SelectedContent"/>
+            </Border>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+</ResourceDictionary>
